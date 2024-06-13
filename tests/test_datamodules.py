@@ -4,7 +4,24 @@ import pytest
 import torch
 
 from src.data.mnist_datamodule import MNISTDataModule
+from src.data.brats_datamodule import BratsDataModule
 
+
+@pytest.mark.parametrize("batch_size",[2,])
+def test_brats_datamodule(batch_size:int):
+    data_dir = 'D:\\Neuroscience and Neuroimaging\\CAP5516 Medical Image Computing\\MSD\\brats_subset'
+
+    dm.setup()
+    dm = BratsDataModule(data_dir=data_dir)
+
+    assert dm.train_dataloader() != None, f'Cannot create train dataloader'
+
+    assert len(dm.train_dataloader()) != 0 , f'Train loader empty'
+
+
+    assert dm.val_dataloader() != None, f'Cannot create val dataloder'
+    assert len(dm.val_dataloader()) != 0, f'Val loader empty'
+    
 
 @pytest.mark.parametrize("batch_size", [32, 128])
 def test_mnist_datamodule(batch_size: int) -> None:
