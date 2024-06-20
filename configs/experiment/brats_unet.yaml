@@ -40,7 +40,7 @@ trainer:
 data:
   _target_: src.data.brats_datamodule.BratsDataModule
   # data_dir: ${paths.data_dir}
-  data_dir: "C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\processed"
+  data_dir: "C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\"
   batch_size: 1
   # num_workers: 0
   # pin_memory: True
