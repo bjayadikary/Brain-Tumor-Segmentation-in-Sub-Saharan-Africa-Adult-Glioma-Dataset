@@ -19,29 +19,31 @@ seed: 12345
 
 trainer:
   min_epochs: 1
-  max_epochs: 5
+  max_epochs: 3
   gradient_clip_val: 0.5
   accelerator: gpu
   devices: [0]
+  log_every_n_steps: 1
   # logger: True
 
-model:
-  # optimizer:
-    # lr: 0.002
-  net:
-    spatial_dims: 3
-    in_channels: 4
-    out_channels: 4
-    channels: [16, 32, 64, 128, 256]
-    strides: [2, 2, 2, 2]
-  # compile: false
+# model:
+#   # optimizer:
+#     # lr: 0.002
+#   net:
+#     spatial_dims: 3
+#     in_channels: 4
+#     out_channels: 4
+#     channels: [16, 32, 64, 128, 256]
+#     strides: [2, 2, 2, 2]
+#   # compile: false
 
 data:
   _target_: src.data.brats_datamodule.BratsDataModule
-  data_dir: ${paths.data_dir}
+  # data_dir: ${paths.data_dir}
+  data_dir: "C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\processed"
   batch_size: 1
-  num_workers: 0
-  pin_memory: false
+  # num_workers: 0
+  # pin_memory: True
 
 # logger:
 #   wandb:

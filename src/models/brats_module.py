@@ -1,6 +1,7 @@
 from typing import Any, Dict, Tuple
 
 import torch
+import torchio as tio
 from lightning import LightningModule
 
 from monai.metrics import CumulativeIterationMetric
@@ -41,7 +42,8 @@ class BratsLitModule(LightningModule):
         return self.net(X)
 
     def training_step(self,
-                      batch: Dict[str, torch.Tensor],
+                      batch,
+                    #   batch: Dict[str, torch.Tensor ],
                       batch_idx: int):
         """Perform a single training step on a batch of data from training set.
         :param batch: A batch of data containing the input tensor of images and mask, accessed via key 'image' and 'mask'
@@ -49,34 +51,36 @@ class BratsLitModule(LightningModule):
         :return: A tensor of losses between model predictions and targets
         """
         
-        X, Y = batch['image'], batch['mask']
+        X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
         logits = self(X) # equivalent to self.forward(X)
         loss = self.dice_loss_fn(logits, Y) # logits of shape [batch, 4, 128, 240, 240] and loss_fn convertes Y to one-hot resulting the same shape as logits.
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True) # If logger=False, it (train_loss) won't be logged into csv file or TensorBoard depending upon logger=csv is used or something else.
         return loss
 
         # PL automatically does gradient cleaning{model.zero_grad()}, accumulating derivatives{loss.backward()}, and step in opposite direction of gradient i.e. backpropagation (optimizer.step())
     
     def validation_step(self,
-                        batch: Dict[str, torch.Tensor],
+                        batch,
+                        # batch: Dict[str, torch.Tensor],
                         batch_idx: int):
         """Perform a single validation step on a batch of data from the validation set"""
 
-        X, Y = batch['image'], batch['mask']
+        X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
         val_logits = self(X)
         predicted_class_labels_val = torch.argmax(val_logits, dim=1, keepdim=True) # val_logits of shape [batch, 4, D, H, W] {raw logits}, after argmax [batch, D, H, W] {0, 1, 2, 3}, since it takes argmax along the channels (or, the #classes)
         batch_dice_score_val = self.dice_score_fn_val(predicted_class_labels_val, Y)
 
     def test_step(self,
-                  batch: Dict[str, torch.Tensor],
+                  batch,
+                #   batch: Dict[str, torch.Tensor],
                   batch_idx: int) -> None:
         """Perform a single test step on a batch of data from the test set"""
         
-        X, Y = batch['image'], batch['mask']
+        X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
         test_logits = self(X)
         predicted_class_labels_test = torch.argmax(test_logits, dim=1, keepdim=True)
         batch_dice_score_test = self.dice_score_fn_test(predicted_class_labels_test, Y)
-        pass
+        # pass
 
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends"""
