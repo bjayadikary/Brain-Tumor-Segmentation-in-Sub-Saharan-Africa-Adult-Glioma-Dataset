@@ -18,8 +18,8 @@ net:
   spatial_dims: 3 # 3 for using 3D ConvNet and 3D Maxpooling
   in_channels: 4 # since 4 modalities
   out_channels: 4 # 4 sub-regions to segment
-  # channels: [16, 32, 64, 128, 256]
-  channels: [64, 128, 256, 512, 1024]
+  channels: [16, 32, 64, 128, 256]
+  # channels: [64, 128, 256, 512, 1024]
   strides: [2, 2, 2, 2]
   norm: BATCH
   
