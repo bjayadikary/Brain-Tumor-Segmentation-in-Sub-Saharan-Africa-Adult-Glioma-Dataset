@@ -77,7 +77,8 @@ def test_brats_datamodule_post_transform_shapes_and_intensites(brats_datamodule:
         transformed_subject_image_data = transformed_subject['image'][tio.DATA]
         transformed_subject_mask_data = transformed_subject['mask'][tio.DATA]
 
-        expected_image_shape = (4, 256, 256, 256) # Before the dataloader is called, we would have this shape. But if the data is coming from dataloder, the first dimension represent the batch dimension so the expected shape will be (1, 4, 256, 256, 256)
+        # expected_image_shape = (4, 256, 256, 256) # Before the dataloader is called, we would have this shape. But if the data is coming from dataloder, the first dimension represent the batch dimension so the expected shape will be (1, 4, 256, 256, 256)
+        expected_image_shape = (4, 128, 128, 128)
         assert transformed_subject_image_data.shape == expected_image_shape
         
         # Check if the mean of the transformed image is close to 0 and SD close to 1.
@@ -87,7 +88,8 @@ def test_brats_datamodule_post_transform_shapes_and_intensites(brats_datamodule:
         assert torch.isclose(torch.tensor(transformed_mean), torch.tensor(0.0), atol=1e-6), f'Mean is not ~0 after normalization {transformed_mean}'
         assert torch.isclose(torch.tensor(transformed_std), torch.tensor(1.0), atol=1e-6), f'Standard Deviation is not ~1 after normalization {transformed_std}'
 
-        expected_mask_shape = (1, 256, 256, 256)
+        # expected_mask_shape = (1, 256, 256, 256)
+        expected_mask_shape = (1, 128, 128, 128)
         assert transformed_subject_mask_data.shape == expected_mask_shape
 
         # Ensure the mask intensities are not transformed i.e. belongs to {0.0, 1.0, 2.0, 3.0}

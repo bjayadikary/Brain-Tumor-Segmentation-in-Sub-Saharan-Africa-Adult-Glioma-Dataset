@@ -33,7 +33,7 @@ model:
     out_channels: 4
     channels: [16, 32, 64, 128, 256]
     # channels: [64, 128, 256, 512, 1024]
-    strides: [2, 2, 2, 2])
+    strides: [2, 2, 2, 2]
     norm: BATCH
 
 data:
