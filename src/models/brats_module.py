@@ -7,6 +7,8 @@ from lightning import LightningModule
 from monai.metrics import CumulativeIterationMetric
 from monai.losses import DiceLoss
 from monai.metrics.meandice import DiceMetric
+import wandb
+import numpy as np
 
 
 class BratsLitModule(LightningModule):
@@ -31,6 +33,7 @@ class BratsLitModule(LightningModule):
         self.dice_loss_fn = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
         
         # Initialize dice score for calculating validation dice score and test dice score
+        self.dice_score_fn_train = DiceMetric(include_background=False)
         self.dice_score_fn_val = DiceMetric(include_background=False)
         self.dice_score_fn_test = DiceMetric(include_background=False)
 
@@ -55,6 +58,15 @@ class BratsLitModule(LightningModule):
         logits = self(X) # equivalent to self.forward(X)
         loss = self.dice_loss_fn(logits, Y) # logits of shape [batch, 4, 128, 240, 240] and loss_fn convertes Y to one-hot resulting the same shape as logits.
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True) # If logger=False, it (train_loss) won't be logged into csv file or TensorBoard depending upon logger=csv is used or something else.
+
+        # Log predicted_mask of train samples to wandb
+        predicted_class_labels_train = torch.argmax(logits, dim=1, keepdim=True)
+        self.dice_score_fn_train(predicted_class_labels_train, Y)
+        self.log('train_score', self.dice_score_fn_train.aggregate().item(), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.dice_score_fn_train.reset()
+
+        if batch_idx == 0: # Log only for the first batch to reduce the number of images logged
+            self.log_images(X, Y, predicted_class_labels_train, "train", batch_idx)
         return loss
 
         # PL automatically does gradient cleaning{model.zero_grad()}, accumulating derivatives{loss.backward()}, and step in opposite direction of gradient i.e. backpropagation (optimizer.step())
@@ -68,7 +80,12 @@ class BratsLitModule(LightningModule):
         X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
         val_logits = self(X)
         predicted_class_labels_val = torch.argmax(val_logits, dim=1, keepdim=True) # val_logits of shape [batch, 4, D, H, W] {raw logits}, after argmax [batch, D, H, W] {0, 1, 2, 3}, since it takes argmax along the channels (or, the #classes)
-        batch_dice_score_val = self.dice_score_fn_val(predicted_class_labels_val, Y)
+        self.dice_score_fn_val(predicted_class_labels_val, Y)
+
+        # Log predicted mask of val samples to wandb
+        if batch_idx == 0:
+            self.log_images(X, Y, predicted_class_labels_val, 'val', batch_idx)
+
 
     def test_step(self,
                   batch,
@@ -79,8 +96,11 @@ class BratsLitModule(LightningModule):
         X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
         test_logits = self(X)
         predicted_class_labels_test = torch.argmax(test_logits, dim=1, keepdim=True)
-        batch_dice_score_test = self.dice_score_fn_test(predicted_class_labels_test, Y)
-        # pass
+        self.dice_score_fn_test(predicted_class_labels_test, Y)
+
+        # Log predicted mask of test samples to wandb
+        if batch_idx == 0:
+            self.log_images(X, Y, predicted_class_labels_test, 'test', batch_idx)
 
     def on_validation_epoch_end(self) -> None:
         """Lightning hook that is called when a validation epoch ends"""
@@ -96,9 +116,59 @@ class BratsLitModule(LightningModule):
 
     def configure_optimizers(self):
         """Configure what optimizers and learning-rate schedulers to use in our optimization"""
-        optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        optimizer = torch.optim.Adam(self.parameters(), lr=0.002)
         return optimizer
     
+    def log_images(self, X, Y, predicted_class_labels, stage, batch_idx):
+        # Convert tensors to numpy arrays for logging into wandb
+        X = X.cpu().float().numpy() # [B, C=4, H, W, D]
+        Y = Y.cpu().float().numpy() # [B, C=1, H, W, D]
+        predicted = predicted_class_labels.cpu().float().numpy() # [B, C=1, H, W, D]
+
+       # Take a middle slice from input (X), ground mask (Y), predicted mask (predicted)
+        slice_idx = X.shape[4]//2 # middle_slcie along the depth
+        middle_slice_input = X[0, 0, :, :, slice_idx] # C=0 is taken i.e. one of the four modalities
+        middle_slice_ground = Y[0, 0, :, :, slice_idx]
+        middle_slice_pred = predicted[0, 0, :, :, slice_idx]
+
+        # Log the input, ground mask, and predicted mask
+        self.logger.experiment.log({
+            f"{stage}_ground_truth_{batch_idx}": wandb.Image(
+                self.apply_color_map(middle_slice_ground),
+                caption=f"{stage.capitalize()} Ground Mask, Epoch {self.current_epoch}, Batch {batch_idx}, Slice_idx {Y.shape[4]//2}"
+            ),
+
+            f"{stage}_predicted_mask_{batch_idx}": wandb.Image(
+                self.apply_color_map(middle_slice_pred), 
+                caption=f"{stage.capitalize()} Predicted Mask, Epoch {self.current_epoch}, Batch {batch_idx}, slice_idx{predicted.shape[4]//2}"
+            ), 
+            
+            f"{stage}_image_{batch_idx}": wandb.Image(
+                middle_slice_input,
+                caption=f"{stage.capitalize()} Input, Epoch {self.current_epoch}, Batch {batch_idx}, Slice_idx {X.shape[4]//2}"
+            ),
+
+        })
+
+    def apply_color_map(self, mask):
+        # Define custom colors for each class
+        colors = {
+            0: [0, 0, 0],       # Black for background
+            1: [255, 0, 0],     # Red for Non-Enhancing Tumor
+            2: [255, 255, 0],   # Yellow for Enhancing Region
+            3: [0, 255, 0],     # Green for Edema/Whole Tumor
+        }
+
+        unique_classes = np.unique(mask) # Identify all unique class values in the mask, [0., 1., 2., 3.]
+        colored_mask = np.zeros((*mask.shape, 3), dtype=np.uint8) # Initialize the colored mask, mask.shape -> (128, 128), colored_mask.shape ->(128, 128, 3)
+
+        for class_id in unique_classes: # Map each class value in the mask to a color from the colormap
+            if class_id in colors:
+                # Apply the color to the mask
+                colored_mask[mask==class_id] = colors[class_id]
+
+        return colored_mask
+
 
 if __name__ == "__main__":
     _ = BratsLitModule(None, None, None, None)
