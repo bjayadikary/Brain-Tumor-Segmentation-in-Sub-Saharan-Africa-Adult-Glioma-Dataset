@@ -35,7 +35,7 @@ model:
     # channels: [64, 128, 256, 512, 1024]
     strides: [2, 2, 2, 2]
     norm: BATCH
-    dropout: 0.3
+    dropout: 0.2
 
 data:
   _target_: src.data.brats_datamodule.BratsDataModule

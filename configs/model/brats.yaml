@@ -21,7 +21,7 @@ net:
   # channels: [64, 128, 256, 512, 1024]
   strides: [2, 2, 2, 2]
   norm: BATCH
-  dropout: 0.4
+  dropout: 0.2
   
 
 # compile model for faster training with pytorch 2.0
