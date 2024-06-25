@@ -18,8 +18,8 @@ class BratsLitModule(LightningModule):
     """
     def __init__(self,
                  net: torch.nn.Module, # model to train
-                #  optimizer: torch.optim.Optimizer, # optimizer to use for training
-                #  scheduler: torch.optim.lr_scheduler, # learning rate scheduler to use for training
+                 optimizer: torch.optim.Optimizer, # optimizer to use for training
+                 scheduler: torch.optim.lr_scheduler, # learning rate scheduler to use for training
                 #  compile: bool,
                  ) -> None:
         super().__init__()
@@ -116,8 +116,20 @@ class BratsLitModule(LightningModule):
 
     def configure_optimizers(self):
         """Configure what optimizers and learning-rate schedulers to use in our optimization"""
-        optimizer = torch.optim.Adam(self.parameters(), lr=0.002)
-        return optimizer
+        # optimizer = torch.optim.Adam(self.parameters(), lr=0.002)
+        optimizer = self.hparams.optimizer(params=self.trainer.model.parameters()) # Creates an optimizer using a class stored in self.hparams.optimizer
+        if self.hparams.scheduler is not None:
+            scheduler = self.hparams.scheduler(optimizer=optimizer)
+            return {
+                "optimizer": optimizer,
+                "lr_scheduler": {
+                    "scheduler": scheduler,
+                    "monitor": "val_score",
+                    "interval": "epoch",
+                    "frequency": 1,
+                },
+            }
+        return {"optimizer": optimizer}
     
     def log_images(self, X, Y, predicted_class_labels, stage, batch_idx):
         # Convert tensors to numpy arrays for logging into wandb

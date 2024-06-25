@@ -13,7 +13,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["brats", "unet", "SSA Full"]
+tags: ["brats", "unet", "SSA"]
 
 seed: 12345
 
@@ -35,6 +35,7 @@ model:
     # channels: [64, 128, 256, 512, 1024]
     strides: [2, 2, 2, 2]
     norm: BATCH
+    dropout: 0.2
 
 data:
   _target_: src.data.brats_datamodule.BratsDataModule
