@@ -17,11 +17,11 @@ net:
   # in_channels: 4
   # out_channels: 4
 
-  # mednextv1_small
+  # mednextv1_small with n_channels=4 (mednextv1_small original has n_channels=32)
   _target_: src.models.components.mednext.MedNeXt.MedNeXt
   in_channels: 4
   n_classes: 4
-  n_channels: 32
+  n_channels: 4
   exp_r: 2
   kernel_size: 3
   # deep_supervision: ds # network produces outputs at multiple scales

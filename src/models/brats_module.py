@@ -9,6 +9,7 @@ from monai.losses import DiceLoss
 from monai.metrics.meandice import DiceMetric
 import wandb
 import numpy as np
+from pytorch_lightning.loggers import WandbLogger
 
 
 class BratsLitModule(LightningModule):
@@ -143,24 +144,25 @@ class BratsLitModule(LightningModule):
         middle_slice_ground = Y[0, 0, :, :, slice_idx]
         middle_slice_pred = predicted[0, 0, :, :, slice_idx]
 
-        # Log the input, ground mask, and predicted mask
-        self.logger.experiment.log({
-            f"{stage}_ground_truth_{batch_idx}": wandb.Image(
-                self.apply_color_map(middle_slice_ground),
-                caption=f"{stage.capitalize()} Ground Mask, Epoch {self.current_epoch}, Batch {batch_idx}, Slice_idx {Y.shape[4]//2}"
-            ),
+        if isinstance(self.logger, WandbLogger):
+            # Log the input, ground mask, and predicted mask
+            self.logger.experiment.log({
+                f"{stage}_ground_truth_{batch_idx}": wandb.Image(
+                    self.apply_color_map(middle_slice_ground),
+                    caption=f"{stage.capitalize()} Ground Mask, Epoch {self.current_epoch}, Batch {batch_idx}, Slice_idx {Y.shape[4]//2}"
+                ),
 
-            f"{stage}_predicted_mask_{batch_idx}": wandb.Image(
-                self.apply_color_map(middle_slice_pred), 
-                caption=f"{stage.capitalize()} Predicted Mask, Epoch {self.current_epoch}, Batch {batch_idx}, slice_idx{predicted.shape[4]//2}"
-            ), 
-            
-            f"{stage}_image_{batch_idx}": wandb.Image(
-                middle_slice_input,
-                caption=f"{stage.capitalize()} Input, Epoch {self.current_epoch}, Batch {batch_idx}, Slice_idx {X.shape[4]//2}"
-            ),
+                f"{stage}_predicted_mask_{batch_idx}": wandb.Image(
+                    self.apply_color_map(middle_slice_pred), 
+                    caption=f"{stage.capitalize()} Predicted Mask, Epoch {self.current_epoch}, Batch {batch_idx}, slice_idx{predicted.shape[4]//2}"
+                ), 
+                
+                f"{stage}_image_{batch_idx}": wandb.Image(
+                    middle_slice_input,
+                    caption=f"{stage.capitalize()} Input, Epoch {self.current_epoch}, Batch {batch_idx}, Slice_idx {X.shape[4]//2}"
+                ),
 
-        })
+            })
 
     def apply_color_map(self, mask):
         # Define custom colors for each class

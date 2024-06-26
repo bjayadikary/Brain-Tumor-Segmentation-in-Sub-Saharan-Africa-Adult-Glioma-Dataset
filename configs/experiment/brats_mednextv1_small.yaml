@@ -5,7 +5,7 @@
 
 defaults:
   - override /data: brats
-  - override /model: mednext
+  - override /model: mednextv1_small
   - override /callbacks: default
   - override /trainer: default
   - override /logger: wandb.yaml
@@ -28,11 +28,6 @@ trainer:
 
 model:
   net:
-    # own model
-    # _target_: src.models.components.med.Med_Final2
-    # in_channels: 4
-    # out_channels: 4
-
     # mednextv1_small
     _target_: src.models.components.mednext.MedNeXt.MedNeXt # points to the MedNeXt class in MedNeXt.py file, which is under mednext folder
     in_channels: 4
