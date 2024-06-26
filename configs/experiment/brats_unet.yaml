@@ -47,9 +47,10 @@ data:
 
 logger:
   wandb:
-    project: "BraTS_SSA_UNet"
+    project: "BraTS_SSA_UNet_Server"
     tags: ${tags}
     # name: ${experiment_name}
+    mode: "offline"
     
 
 callbacks:
