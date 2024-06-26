@@ -37,7 +37,7 @@ model:
     _target_: src.models.components.mednext.MedNeXt.MedNeXt # points to the MedNeXt class in MedNeXt.py file, which is under mednext folder
     in_channels: 4
     n_classes: 4
-    n_channels: 4
+    n_channels: 6
     exp_r: 2
     kernel_size: 3
     deep_supervision: False

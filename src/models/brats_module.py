@@ -2,14 +2,16 @@ from typing import Any, Dict, Tuple
 
 import torch
 import torchio as tio
-from lightning import LightningModule
 
 from monai.metrics import CumulativeIterationMetric
 from monai.losses import DiceLoss
 from monai.metrics.meandice import DiceMetric
-import wandb
+
 import numpy as np
-from pytorch_lightning.loggers import WandbLogger
+from lightning import LightningModule
+# from lightning.pytorch.loggers import wandb # threw error in wandb.Image
+import wandb
+from lightning.pytorch.loggers.wandb import WandbLogger
 
 
 class BratsLitModule(LightningModule):
@@ -66,7 +68,7 @@ class BratsLitModule(LightningModule):
         self.log('train_score', self.dice_score_fn_train.aggregate().item(), on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.dice_score_fn_train.reset()
 
-        if batch_idx == 0: # Log only for the first batch to reduce the number of images logged
+        if batch_idx == 1: # Log only for the first batch to reduce the number of images logged
             self.log_images(X, Y, predicted_class_labels_train, "train", batch_idx)
         return loss
 
@@ -82,6 +84,10 @@ class BratsLitModule(LightningModule):
         val_logits = self(X)
         predicted_class_labels_val = torch.argmax(val_logits, dim=1, keepdim=True) # val_logits of shape [batch, 4, D, H, W] {raw logits}, after argmax [batch, D, H, W] {0, 1, 2, 3}, since it takes argmax along the channels (or, the #classes)
         self.dice_score_fn_val(predicted_class_labels_val, Y)
+
+        val_avg_dice = self.dice_score_fn_val.aggregate().item()
+        self.log('val_score', val_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.dice_score_fn_val.reset()
 
         # Log predicted mask of val samples to wandb
         if batch_idx == 0:
@@ -99,21 +105,25 @@ class BratsLitModule(LightningModule):
         predicted_class_labels_test = torch.argmax(test_logits, dim=1, keepdim=True)
         self.dice_score_fn_test(predicted_class_labels_test, Y)
 
+        test_avg_dice = self.dice_score_fn_test.aggregate().item()
+        self.log('test_score', test_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.dice_score_fn_test.reset()
+
         # Log predicted mask of test samples to wandb
-        if batch_idx == 0:
+        if batch_idx == 5:
             self.log_images(X, Y, predicted_class_labels_test, 'test', batch_idx)
 
-    def on_validation_epoch_end(self) -> None:
-        """Lightning hook that is called when a validation epoch ends"""
-        val_avg_dice = self.dice_score_fn_val.aggregate().item()
-        self.log('val_score', val_avg_dice, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.dice_score_fn_val.reset()
+    # def on_validation_epoch_end(self) -> None:
+    #     """Lightning hook that is called when a validation epoch ends"""
+    #     val_avg_dice = self.dice_score_fn_val.aggregate().item()
+    #     self.log('val_score', val_avg_dice, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+    #     self.dice_score_fn_val.reset()
 
-    def on_test_epoch_end(self) -> None:
-        """Lightning hook that is called when a test epoch ends"""
-        test_avg_dice = self.dice_score_fn_test.aggregate().item()
-        self.log('test_score', test_avg_dice, on_step=False, on_epoch=True, prog_bar=True, logger=True)
-        self.dice_score_fn_test.reset()
+    # def on_test_epoch_end(self) -> None:
+    #     """Lightning hook that is called when a test epoch ends"""
+    #     test_avg_dice = self.dice_score_fn_test.aggregate().item()
+    #     self.log('test_score', test_avg_dice, on_step=False, on_epoch=True, prog_bar=True, logger=True)
+    #     self.dice_score_fn_test.reset()
 
     def configure_optimizers(self):
         """Configure what optimizers and learning-rate schedulers to use in our optimization"""

@@ -33,7 +33,6 @@ class BratsDataModule(LightningDataModule):
         self.train_transform = tio.Compose([ # input of shape (B, C, 240, 240, 155) goes through it
             tio.ToCanonical(), # Ensures same orientation of RAS
             tio.Resize(target_shape=(128, 128, 128)), # this transform should not be used as it will deform the physical object by scaling anistropically along the different dimensions. The solution to change an image size is typically applying Resample and CropOrPad.
-            # tio.RemapLabels({4:3}), # Change the labels of segmentation mask from 4 to 3. Making the labels of Enhancing Tumor in Brats2021 and Brats_SSA same.
             # tio.Resample(1),
             # tio.CropOrPad(target_shape=(256, 256, 256), mask_name='mask'),
             tio.ZNormalization() # Ensures resulting distribution of zero mean and unit SD.
@@ -42,7 +41,6 @@ class BratsDataModule(LightningDataModule):
         self.val_transform = tio.Compose([
             tio.ToCanonical(),
             tio.Resize(target_shape=(128, 128, 128)),
-            # tio.RemapLabels({4:3}),
             # tio.Resample(1),
             # tio.CropOrPad(target_shape=(256, 256, 256), mask_name='mask'),
             tio.ZNormalization(),
@@ -51,7 +49,6 @@ class BratsDataModule(LightningDataModule):
         self.test_transform = tio.Compose([
             tio.ToCanonical(),
             tio.Resize(target_shape=(128, 128, 128)),
-            # tio.RemapLabels({4:3}),
             # tio.Resample(1),
             # tio.CropOrPad(target_shape=(256, 256, 256), mask_name='mask'),
             tio.ZNormalization()
