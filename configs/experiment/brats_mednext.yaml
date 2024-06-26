@@ -68,7 +68,7 @@ callbacks:
     monitor: val_score
     filename: best-checkpoint
     save_top_k: 1
-    mode: "min"
+    mode: "max"
     save_last: True
 
   early_stopping: null

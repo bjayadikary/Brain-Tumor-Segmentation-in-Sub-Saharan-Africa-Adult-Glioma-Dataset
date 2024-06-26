@@ -271,7 +271,7 @@ def mednext_model():
     model = MedNeXt(
         in_channels=4,
         n_classes=4,
-        n_channels=32,
+        n_channels=4,
         kernel_size=3
     )
     return model
