@@ -8,13 +8,14 @@ from src.data.brats_datamodule import BratsDataModule
 
 from src.models.components.unet import UNet
 from src.models.brats_module import BratsLitModule
+from src.models.components.mednext.MedNeXt import MedNeXt
 
 import torchio as tio
 
 
 @pytest.mark.parametrize("batch_size",[1,])
 def test_brats_datamodule(batch_size:int):
-    data_dir = 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\processed'
+    data_dir = 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset'
 
     dm:BratsDataModule = BratsDataModule(data_dir=data_dir)
     dm.setup()
@@ -48,7 +49,7 @@ def test_brats_datamodule(batch_size:int):
 # This test function ensures that 'BratsDataModule' class initializes correctly with different batch sizes and the attributes are set as expected
 @pytest.mark.parametrize("batch_size", [1, 2, 4]) # test will be run three times with 'batch_size' values of 1, 2, and 4
 def test_brats_datamodule_initialization(batch_size: int): # takes 'batch_size' as an argument. This argument will take on each of the values specified in the parametrize decorator one by one
-    data_dir = 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\processed'
+    data_dir = 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset'
     dm = BratsDataModule(data_dir, batch_size=batch_size)
     assert dm.data_dir == data_dir # checks that 'data_dir' attribute of the 'BratsDataModule' instance is correctly set to the value specified during initialization
     assert dm.batch_size == batch_size # verify if 'batch_size' attribute of the 'BratsDataModule' instance is correclty set to the value specified during initialization
@@ -56,7 +57,7 @@ def test_brats_datamodule_initialization(batch_size: int): # takes 'batch_size' 
 
 @pytest.fixture
 def brats_datamodule(batch_size):
-    return BratsDataModule(data_dir='C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\processed', batch_size=batch_size)
+    return BratsDataModule(data_dir='C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset', batch_size=batch_size)
 
 # Test function to checks shapes and intensities of image and segmentation mask after applying the Transformations
 # pytest will automatically call the brats_datamodule() fixture function before each test function that uses the brats_datamodule fixture as an argument. This means each test function will have access to a fresh instance of the BratsDataModule class, and can access its attributes and methods, such as train_transform
@@ -116,8 +117,8 @@ def test_brats_datamodule_dataloaders(brats_datamodule: BratsDataModule, batch_s
     assert train_y.dtype == torch.float32
 
     # Assert the datas shapes coming from dataloader is valid
-    expected_image_shape_from_dataloader = (batch_size, 4, 256, 256, 256)
-    expected_mask_shape_from_dataloader = (batch_size, 1, 256, 256, 256)
+    expected_image_shape_from_dataloader = (batch_size, 4, 128, 128, 128)
+    expected_mask_shape_from_dataloader = (batch_size, 1, 128, 128, 128)
     assert train_x.shape == expected_image_shape_from_dataloader
     assert train_y.shape == expected_mask_shape_from_dataloader
 
@@ -148,7 +149,7 @@ def test_brats_datamodule_dataloaders(brats_datamodule: BratsDataModule, batch_s
 # This test function checks if the function resposible for transferring data to the GPU is valid or not
 @pytest.mark.parametrize("batch_size", [1, 2, 4])
 def test_brats_datamodule_transfer_to_device(batch_size: int):
-    data_dir = 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\processed'
+    data_dir = 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset'
     dm = BratsDataModule(data_dir, batch_size=batch_size)
     dm.setup(stage='fit') # calls the 'setup' method of 'BratsDataModule' with 'stage=fit', preparign the data for training and validaiton stages.
 
@@ -175,31 +176,49 @@ def unet_model():
     )
     return model
 
+
 def test_brats_litmodule_initialization(unet_model: torch.nn.Module):
-    module = BratsLitModule(net=unet_model)
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(unet_model.parameters(), lr=0.001, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+
+    module = BratsLitModule(net=unet_model, optimizer=optimizer, scheduler=scheduler)
     assert module.net == unet_model
     assert module.hparams is not None
 
 @pytest.mark.parametrize("batch_size", [1, 2])
-def test_brats_litmodule_forward_pass(unet_model: torch.nn.Module, batch_size:int):
-    module = BratsLitModule(net=unet_model)
-    input_tensor = torch.randn(batch_size, 4, 256, 256, 256)
+def test_brats_litmodule_forward_pass_unet(unet_model: torch.nn.Module, batch_size:int):
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(unet_model.parameters(), lr=0.001, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+
+    module = BratsLitModule(net=unet_model, optimizer=optimizer, scheduler=scheduler)
+    input_tensor = torch.randn(batch_size, 4, 128, 128, 128)
     output = module.forward(input_tensor) # logits of shape (BCDHW)
-    expected_shape = (batch_size, 4, 256, 256, 256)
+
+    # Ensure logits is a tensor
+    assert isinstance(output, torch.Tensor)
+        
+    expected_shape = (batch_size, 4, 128, 128, 128)
     assert output.shape == expected_shape
+
 
 @pytest.mark.parametrize("batch_size", [1, 2])
 def test_brats_litmodule_training_and_validation_step(unet_model: UNet, brats_datamodule: BratsDataModule, batch_size:int):
     dm = brats_datamodule
     dm.setup(stage='fit')
     train_loader = dm.train_dataloader()
-
+    
     assert train_loader is not None
     assert len(train_loader) > 0
 
     train_batch = next(iter(train_loader))
+
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(unet_model.parameters(), lr=0.001, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
     
-    module = BratsLitModule(net=unet_model)
+    module = BratsLitModule(net=unet_model, optimizer=optimizer, scheduler=scheduler)
     batch_idx = 0
     loss = module.training_step(train_batch, batch_idx)
     assert isinstance(loss, torch.Tensor), f"Expected loss to be a torch.Tensor but got {type(loss)}"
@@ -245,3 +264,30 @@ def test_mnist_datamodule(batch_size: int) -> None:
     assert len(y) == batch_size
     assert x.dtype == torch.float32
     assert y.dtype == torch.int64
+
+
+@pytest.fixture
+def mednext_model():
+    model = MedNeXt(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        kernel_size=3
+    )
+    return model
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_brats_litmodule_forward_pass_mednext(mednext_model: torch.nn.Module, batch_size:int):
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednext_model.parameters(), lr=0.001, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+
+    module = BratsLitModule(net=mednext_model, optimizer=optimizer, scheduler=scheduler)
+    input_tensor = torch.randn(batch_size, 4, 128, 128, 128)
+    output = module.forward(input_tensor) # logits of shape (BCDHW)
+
+    # Ensure logits is a tensor
+    assert isinstance(output, torch.Tensor)
+        
+    expected_shape = (batch_size, 4, 128, 128, 128)
+    assert output.shape == expected_shape
