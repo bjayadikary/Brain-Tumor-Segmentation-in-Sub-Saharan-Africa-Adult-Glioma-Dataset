@@ -1,5 +1,84 @@
-<div align="center">
+# Stacking the Files
+The SSA dataset directory looks like:
+```
+BraTS2023_SSA
+|-- BraTS2023_SSA_Training
+|   |--ASNR-MICCAI-BraTS2023-SSA-Challenge-TrainingData_V2
+|   |   |-- BraTS-SSA-00002-000
+|   |   |   |-- BraTS-SSA-00002-000-seg.nii.gz
+|   |   |   |-- BraTS-SSA-00002-000-t1c.nii.gz
+|   |   |   |-- BraTS-SSA-00002-000-t1n.nii.gz
+|   |   |   |-- BraTS-SSA-00002-000-t2f.nii.gz
+|   |   |   |-- BraTS-SSA-00002-000-t2w.nii.gz
+|   |   |-- BraTS-SSA-00007-000
+|   |   |   |-- BraTS-SSA-00007-000-seg.nii.gz
+|   |   |   |-- BraTS-SSA-00007-000-t1c.nii.gz
+|   |   |   |-- BraTS-SSA-00007-000-t1n.nii.gz
+|   |   |   |-- BraTS-SSA-00007-000-t2f.nii.gz
+|   |   |   |-- BraTS-SSA-00007-000-t2w.nii.gz
+|   |   |--...
+|-- BraTS2023_SSA_Validation
+|   |-- BraTS-SSA-00126-000
+|   |   |-- BraTS-SSA-00126-000-seg.nii.gz
+|   |   |-- BraTS-SSA-00126-000-t1c.nii.gz
+|   |   |-- BraTS-SSA-00126-000-t1n.nii.gz
+|   |   |-- BraTS-SSA-00126-000-t2f.nii.gz
+|   |   |-- BraTS-SSA-00126-000-t2w.nii.gz
+|   |-- BraTS-SSA-00129-000
+|   |   |-- BraTS-SSA-00129-000-seg.nii.gz
+|   |   |-- BraTS-SSA-00129-000-t1c.nii.gz
+|   |   |-- BraTS-SSA-00129-000-t1n.nii.gz
+|   |   |-- BraTS-SSA-00129-000-t2f.nii.gz
+|   |   |-- BraTS-SSA-00129-000-t2w.nii.gz
+|   |   |--...
+```
 
+We have 60 folders in the `BraTS2023_SSA_Training/ASNR-MICCAI-BraTS2023-SSA-Challenge-TrainingData_V2` and 15 folders under `BraTS2023_SSA/BraTS2023_SSA_Validation` directory. Each folder contains 5 NIfTI files: one segmentation mask and four image modalities (t1c, t1n, t2f, t2w).
+
+To process these files, use the `stack_ssa.py` script located in `data_prepare_utils/SSA23`. This script requires two parameters: `source_dir` and `flag`.
+
+We need to run `stack_ssa.py` separately for training, validation, and test samples. In our case, we have training and validation sets only, so will run the script twice:
+
+1. For training sets, do:
+      ```bash
+      python stack_ssa.py --source_dir=full_path_of_ASNR-MICCAI-BraTS2023-SSA-Challenge-TrainingData_V2 --flag=train
+      ```
+      This creates _TrainVolumes_ and _TrainSegmentations_ folders under a _stacked_ directory at the location where stack_ssa.py is run.
+      _TrainVolumes_ contains 60 stacked_nifti image files, and _TrainSegmentations_ contains corresponding 60 segmentation masks.
+2. For validation sets, do:
+     ```bash
+     python stack_ssa.py --source_dir=full_path_of_BraTS2023_SSA_Validation --flag=val
+     ```
+     This creates _ValVolumes_ and _ValSegmentations_ folders under the same _stacked_ directory.
+     _ValVolumes_ contains 15 stacked_nifti image files, and _ValSegmentations_ contains corresponding 15 segmentation masks.
+
+Finally, `stacked` directory looks something like:
+```
+stacked
+|-- TrainVolumes
+|   |-- BraTS-SSA-00002-000_stacked.nii.gz
+|   |-- BraTS-SSA-00007-000_stacked.nii.gz
+|   |-- BraTS-SSA-00008-000_stacked.nii.gz
+|   |-- ...
+|-- TrainSegmentations
+|   |-- BraTS-SSA-00002-000.nii.gz
+|   |-- BraTS-SSA-00007-000.nii.gz
+|   |-- BraTS-SSA-00008-000.nii.gz
+|   |-- ...
+|-- ValVolumes
+|   |-- BraTS-SSA-00126-000_stacked.nii.gz
+|   |-- BraTS-SSA-00129-000_stacked.nii.gz
+|   |-- BraTS-SSA-00132-000_stacked.nii.gz
+|   |-- ...
+|-- ValSegmentations
+|   |-- BraTS-SSA-00126-000.nii.gz
+|   |-- BraTS-SSA-00129-000.nii.gz
+|   |-- BraTS-SSA-00132-000.nii.gz
+|   |-- ...
+```
+<div align="center">
+<br>
+<br>
 # Lightning-Hydra-Template
 
 [![python](https://img.shields.io/badge/-Python_3.8_%7C_3.9_%7C_3.10-blue?logo=python&logoColor=white)](https://github.com/pre-commit/pre-commit)
