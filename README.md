@@ -1,5 +1,5 @@
 # Stacking the Files
-The SSA dataset directory looks something like:
+The SSA dataset directory looks like:
 ```
 BraTS2023_SSA
 |-- BraTS2023_SSA_Training
