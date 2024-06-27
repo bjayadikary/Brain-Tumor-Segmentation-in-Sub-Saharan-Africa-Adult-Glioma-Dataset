@@ -13,7 +13,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["brats", "mednext", "SSA"]
+tags: ["brats", "mednextv1_small"]
 
 seed: 12345
 
@@ -51,7 +51,7 @@ data:
 
 logger:
   wandb:
-    project: "BraTS_SSA_MedNeXt_Server"
+    project: "BraTS_MedNeXt_Server"
     tags: ${tags}
     # name: ${experiment_name}
     mode: "offline"

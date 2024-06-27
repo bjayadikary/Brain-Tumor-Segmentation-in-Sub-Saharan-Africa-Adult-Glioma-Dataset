@@ -13,7 +13,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["brats", "mednext", "SSA"]
+tags: ["brats", "mednext"]
 
 seed: 12345
 
