@@ -145,6 +145,16 @@ Here, we have train_subset, val_subset, and test_subsets, so we need to run `sta
      python stack_and_remap_class_brats21.py --source_dir=full_path_of_test_subset_created_earlier --flag=test
      ```
 Finally, we have `stacked` directory that looks similar to SSA23 stacked directory.
+
+```
+stacked
+|-- TrainVolumes
+|-- TrainSegmentations
+|-- ValVolumes
+|-- ValSegmentations
+|-- TestVolumes
+|-- TestSegmentations
+```
   
 <div align="center">
 <br>
