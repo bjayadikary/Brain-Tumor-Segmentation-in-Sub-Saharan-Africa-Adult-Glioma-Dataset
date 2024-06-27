@@ -44,11 +44,13 @@ We need to run `stack_ssa.py` separately for training, validation, and test samp
    python stack_ssa.py 'full path of BraTS2023_SSA/BraTS2023_SSA_Training/ASNR-MICCAI-BraTS2023-SSA-Challenge-TrainingData_V2' flag='train'
    ```
    This creates _TrainVolumes_ and _TrainSegmentations_ folders under a _stacked_ directory at the location where stack_ssa.py is run.
+   _TrainVolumes_ contains 60 stacked_nifti image files, and _TrainSegmentations_ contains corresponding 60 segmentation masks.
 3. For validation sets, do:
   ```bash
   python stack_ssa.py 'full path of BraTS2023_SSA/BraTS2023_SSA_Validation' flag='val'
   ```
   This creates _ValVolumes_ and _ValSegmentations_ folders under the same _stacked_ directory.
+  _ValVolumes_ contains 15 stacked_nifti image files, and _ValSegmentations_ contains corresponding 15 segmentation masks.
 <div align="center">
 <br>
 <br>
