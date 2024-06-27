@@ -4,7 +4,7 @@ Run the below code to download the dataset
 ```bash
 gdown https://drive.google.com/uc?id=1ooIpXdQrgA2y0PSRz_yMrU8GTxkWbPlv 
 ```
-Now, extract the files with
+Then, Extract the files with
 ```bash
 unrar x BraTS2023_SSA.rar
 ```
