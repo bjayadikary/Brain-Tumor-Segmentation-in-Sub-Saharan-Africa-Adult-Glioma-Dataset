@@ -1,5 +1,15 @@
-# Stacking the Files
-The SSA dataset directory looks like:
+# Data Preparation
+## Downloading the SSA dataset
+Run the below code to download the dataset
+```bash
+gdown https://drive.google.com/uc?id=1ooIpXdQrgA2y0PSRz_yMrU8GTxkWbPlv 
+```
+Now, extract the files with
+```bash
+unrar x BraTS2023_SSA.rar
+```
+
+The BraTS2023_SSA directory looks like:
 ```
 BraTS2023_SSA
 |-- BraTS2023_SSA_Training
@@ -33,6 +43,7 @@ BraTS2023_SSA
 |   |   |--...
 ```
 
+## Stacking the Files
 We have 60 folders in the `BraTS2023_SSA_Training/ASNR-MICCAI-BraTS2023-SSA-Challenge-TrainingData_V2` and 15 folders under `BraTS2023_SSA/BraTS2023_SSA_Validation` directory. Each folder contains 5 NIfTI files: one segmentation mask and four image modalities (t1c, t1n, t2f, t2w).
 
 To process these files, use the `stack_ssa.py` script located in `data_prepare_utils/SSA23`. This script requires two parameters: `source_dir` and `flag`.
