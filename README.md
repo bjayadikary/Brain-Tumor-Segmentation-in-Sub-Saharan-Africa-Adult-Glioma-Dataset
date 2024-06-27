@@ -126,8 +126,11 @@ BraTS2021
 ## Remapping labels and Stacking
 The label for Enhacing Tumor Region in BraTS 2021 and SSA23 is not same. BraTS 2021 has labelled Enhacing Tumor Region as label 4 in the segmentation mask, while SSA23 has label 3 for it.
 So, we need to remap the class 4 to 3, to make it consistent with SSA23 dataset.
+
 Also, We need to stack the four modalities into one.
-Both task is done within the script `stack_and_remap_class_brats21.py`. Similar to `stack_ssa.py`, it takes two parameters: `source_dir` and `flag`.
+
+Both task is done within the script `stack_and_remap_class_brats21.py` provided under `data_prepare_utils/Brats21`. Similar to `stack_ssa.py`, it takes two parameters: `source_dir` and `flag`.
+
 Here, we have train_subset, val_subset, and test_subsets, so we need to run 'stack_and_remap_class_brats21.py' three times.
 1. For remapping and stacking train_subset, do:
      ```bash
