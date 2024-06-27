@@ -1,4 +1,4 @@
-# Data Preparation
+# 📌 Data Preparation for Sub-Saharan African 2023 Dataset (SSA23)
 ## Downloading the SSA dataset
 Run the below code to download the dataset
 ```bash
@@ -87,6 +87,46 @@ stacked
 |   |-- BraTS-SSA-00132-000.nii.gz
 |   |-- ...
 ```
+
+# 📌 Data Preparation for BraTS 2021 Dataset
+* Download the BraTS 2021 dataset from a suitable source. The directory looks similar to SSA23 dataset directory, except the number of samples in BraTS2021 is comparatively higher.
+
+  ## Train Test Split
+* Split the dataset into train, validation, and test sets using `train_test_split.py` script provided under `data_prepare_utils/Brats21`.
+* `train_test_split.py` takes two parameters: `source_dir` and `train_ratio`
+* First, lets split the whole dataset into train and test sets. For this do:
+  ```bash
+  python train_test_split.py --source_dir=full_path_of_BraTS_2021_Dataset --train_ratio=0.8 
+  ```
+  This creates two folders: `train_subset` and `test_subset`
+* Now, Rename the ```test_subset to val_subset``` and ```train_subset to subset```
+* Second, Split the ```subset``` folder into train and test sets. For this do:
+  ```bash
+  python train_test_split_ssa.py --source_dir=full_path_of_subset_folder_just_created_above --train_ratio 0.8
+  ```
+* Delete the ```subset``` folder, if you like.
+  Finally, we have 3 folders: train_subset (~60%), val_subset (~20%), test_subset(~20%)
+
+  ## Remapping labels and Stacking
+  The label for Enhacing Tumor Region in BraTS 2021 and SSA23 is not same. BraTS 2021 has labelled Enhacing Tumor Region as label 4 in the segmentation mask, while SSA23 has label 3 for it.
+  So, we need to remap the class 4 to 3, to make it consistent with SSA23 dataset.
+  Also, We need to stack the four modalities into one.
+  Both task is done within the script `stack_and_remap_class_brats21.py`. Similar to `stack_ssa.py`, it takes two parameters: `source_dir` and `flag`.
+  Here, we have train_subset, val_subset, and test_subsets, so we need to run 'stack_and_remap_class_brats21.py' three times.
+  1. For remapping and stacking train_subset, do:
+     ```bash
+     python stack_and_remap_class_brats21.py --source_dir=full_path_of_train_subset_created_earlier --flag=train
+     ```
+  3. For val_subset, do:
+     ```bash
+     python stack_and_remap_class_brats21.py --source_dir=full_path_of_val_subset_created_earlier --flag=val
+     ```
+  5. For test_subset, do:
+     ```bash
+     python stack_and_remap_class_brats21.py --source_dir=full_path_of_test_subset_created_earlier --flag=test
+     ```
+     
+  
 <div align="center">
 <br>
 <br>
