@@ -53,6 +53,7 @@ We need to run `stack_ssa.py` separately for training, validation, and test samp
   _ValVolumes_ contains 15 stacked_nifti image files, and _ValSegmentations_ contains corresponding 15 segmentation masks.
 
 Finally, `stacked' directory looks something like:
+```
 stacked
 |-- TrainVolumes
 |   |-- BraTS-SSA-00002-000_stacked.nii.gz
@@ -74,7 +75,7 @@ stacked
 |   |-- BraTS-SSA-00129-000.nii.gz
 |   |-- BraTS-SSA-00132-000.nii.gz
 |   |-- ...
-
+```
 <div align="center">
 <br>
 <br>
