@@ -131,7 +131,7 @@ Also, We need to stack the four modalities into one.
 
 Both task is done within the script `stack_and_remap_class_brats21.py` provided under `data_prepare_utils/Brats21`. Similar to `stack_ssa.py`, it takes two parameters: `source_dir` and `flag`.
 
-Here, we have train_subset, val_subset, and test_subsets, so we need to run 'stack_and_remap_class_brats21.py' three times.
+Here, we have train_subset, val_subset, and test_subsets, so we need to run `stack_and_remap_class_brats21.py` three times.
 1. For remapping and stacking train_subset, do:
      ```bash
      python stack_and_remap_class_brats21.py --source_dir=full_path_of_train_subset_created_earlier --flag=train
@@ -144,7 +144,7 @@ Here, we have train_subset, val_subset, and test_subsets, so we need to run 'sta
      ```bash
      python stack_and_remap_class_brats21.py --source_dir=full_path_of_test_subset_created_earlier --flag=test
      ```
-     
+Finally, we have `stacked` directory that looks similar to SSA23 stacked directory.
   
 <div align="center">
 <br>
