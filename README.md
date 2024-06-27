@@ -89,7 +89,7 @@ stacked
 ```
 
 # 📌 Data Preparation for BraTS 2021 Dataset
-Download the BraTS 2021 dataset from a suitable source. The directory looks similar to SSA23 dataset directory, except the number of samples in BraTS2021 is comparatively higher.
+Download the BraTS 2021 dataset with ```gdown https://drive.google.com/uc?id=1gxw-0EpiMCddXwbxScDeSqDNplUZdipU``` and unzip it. The directory looks similar to SSA23 dataset directory, except the number of samples in BraTS2021 is comparatively higher.
 ```
 BraTS2021
 |-- BraTS2021_00000
