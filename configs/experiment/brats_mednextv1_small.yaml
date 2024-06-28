@@ -44,7 +44,7 @@ model:
 data:
   _target_: src.data.brats_datamodule.BratsDataModule
   # data_dir: ${paths.data_dir}
-  data_dir: "C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\utilities\\stacked"
+  data_dir: "/mnt/Enterprise2/shirshak/SPARK_BIJAY_CODE/Spark_Himalaya/stacked"
   batch_size: 1
   num_workers: 0
   # pin_memory: True
