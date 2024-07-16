@@ -10,7 +10,11 @@ from src.models.components.unet import UNet
 from src.models.brats_module import BratsLitModule
 from src.models.components.mednext.MedNeXt import MedNeXt
 
+from src.models.components.mednext.MedNeXt_with_linear_adapter import MedNeXtWithLinearAdapters
+from collections import OrderedDict
+
 import torchio as tio
+
 
 
 @pytest.mark.parametrize("batch_size",[1,])
@@ -62,7 +66,7 @@ def brats_datamodule(batch_size):
 # Test function to checks shapes and intensities of image and segmentation mask after applying the Transformations
 # pytest will automatically call the brats_datamodule() fixture function before each test function that uses the brats_datamodule fixture as an argument. This means each test function will have access to a fresh instance of the BratsDataModule class, and can access its attributes and methods, such as train_transform
 @pytest.mark.parametrize("batch_size", [1, 2])
-def test_brats_datamodule_post_transform_shapes_and_intensites(brats_datamodule: BratsDataModule, batch_size:int):
+def test_brats_datamodule_post_transform_shapes_and_intensities(brats_datamodule: BratsDataModule, batch_size:int):
     dm = brats_datamodule
     dm.setup()
     
@@ -231,7 +235,6 @@ def test_brats_litmodule_training_and_validation_step(unet_model: UNet, brats_da
     
     assert module.dice_score_fn_val.aggregate() is not None
 
-    
 
 
 @pytest.mark.parametrize("batch_size", [32, 128])
@@ -291,3 +294,113 @@ def test_brats_litmodule_forward_pass_mednext(mednext_model: torch.nn.Module, ba
         
     expected_shape = (batch_size, 4, 128, 128, 128)
     assert output.shape == expected_shape
+
+
+########################
+### Testing Checkpoints
+########################
+@pytest.mark.parametrize("batch_size", [1,])
+def test_custom_checkpoint_test(batch_size:int, capsys):
+    # Load the checkpoint
+    checkpoint_path = "D:\\BrainHack\\hydra\\spark_himalaya_git\\logs\\train\\runs\\2024-07-03_15-16-21\\checkpoints\\best-checkpoint.ckpt"
+    checkpoint = torch.load(checkpoint_path)
+
+    with capsys.disabled():
+        for key in checkpoint.keys():
+            print(key)
+
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_brats21_checkpoint_test(batch_size:int, capsys): # The capsys.disabled() context manager allows the print statements to be displayed even when capturing is enabled.
+    # Load the checkpoint
+    checkpoint_path = "D:\\BrainHack\\hydra\\spark_himalaya_git\\logs\\train\\runs\\2024-07-03_15-16-21\\checkpoints\\best-checkpoint.ckpt"
+    checkpoint = torch.load(checkpoint_path)
+
+    with capsys.disabled():
+        for key in checkpoint.keys():
+            print(key)
+
+
+@pytest.fixture
+def mednext_model_with_adapters():
+    model = MedNeXtWithLinearAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=4,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+        adapter_dim_ratio=0.25,
+    )
+    return model
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_checkpoint_load_for_finetuning(mednext_model_with_adapters: torch.nn.Module, batch_size:int, capsys):
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednext_model_with_adapters.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+
+    # Load the pretrained model checkpoint
+    pretrained_ckpt_path = "D:\\BrainHack\\hydra\\spark_himalaya_git\\logs\\train\\runs\\2024-07-12_13-26-22\\checkpoints\\best-checkpoint.ckpt"
+    pretrained_checkpoint = torch.load(pretrained_ckpt_path)
+
+    # Initialize the new model with adapters
+    model_with_adapter = BratsLitModule(net=mednext_model_with_adapters, optimizer=optimizer, scheduler=scheduler)
+
+    # Changing the keys in pretrained_checkpoint to match the keys in model_with_adapter_state_dict
+    for layer_name in list(pretrained_checkpoint['state_dict'].keys()):
+        if 'dec_block' in layer_name or 'bottleneck' in layer_name or 'enc_block' in layer_name:
+            layer_name_split = layer_name.split(".")
+            layer_name_split.insert(2, "0")
+            new_layer_name = ".".join(layer_name_split)
+
+            # deletes the respective key, returns the associated value of that old key
+            layer_values = pretrained_checkpoint['state_dict'].pop(layer_name)
+            
+            # assign the returned value to the new_layer_name
+            pretrained_checkpoint['state_dict'][new_layer_name] = layer_values
+        else:
+            pass
+           
+    # assert if the len in new_layer_name (keys) in pretrained_checkpoint['state_dict'] matches those in model_with_adapter_state_dict, excpet the fully connected adapter's weights and biases
+    assert len(list(pretrained_checkpoint['state_dict'].keys())) == len(list(x for x in model_with_adapter.state_dict().keys() if 'fc' not in x))
+    
+    # assert if every key on pretrained_checkpoint state dict is in model_with_adapter_state_dict
+    count = 0
+    for modified_key in pretrained_checkpoint['state_dict'].keys():
+        if modified_key not in model_with_adapter.state_dict().keys():
+            count +=1
+    assert count == 0
+
+    # Load weights/biases (i.e. state_dict) from pretrained checkpoint to new model with adapter that match the layer names. strict=False ignores non-matching keys, allowing the model to load even if the state dictionary does not perfectly match the model.
+    model_with_adapter.load_state_dict(pretrained_checkpoint['state_dict'], strict=False)
+
+    # Freeze all layers except the adapter layers
+    for name, param in model_with_adapter.named_parameters():
+        if 'dice_loss_fn' in name:
+            with capsys.disabled():
+                print(name)
+        if 'fc' not in name:
+            param.requires_grad = False
+
+    # verify which parameters are trainable
+    # with capsys.disabled():
+    #     for name, param in model_with_adapter.named_parameters():
+    #         print(f"{name}: requires_grad={param.requires_grad}")
+
+    # with capsys.disabled():
+    #     # print(pretrained_checkpoint['optimizer_states'])
+    #     # for key in pretrained_checkpoint.keys():
+    #     #     print(key)
+    #     print('Pretrained dict keys:')
+    #     for name in pretrained_state_dict.keys():
+    #         print(name)
+
+    #     print('Adapter model dict keys')
+    #     for name in new_state_dict.keys():
+    #         print(name)
+
+    

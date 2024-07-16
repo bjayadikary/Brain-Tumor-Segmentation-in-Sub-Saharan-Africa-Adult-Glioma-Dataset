@@ -27,8 +27,9 @@ class BratsLitModule(LightningModule):
                  ) -> None:
         super().__init__()
 
-        # This line allows to access init params with 'self.hparams' attribute, also ensure init params will be stored in ckpt
+        # save_hyperparameters() allows to access init params with 'self.hparams' attribute (i.e. saves hyperparameters including all attributes prefixed with 'self' of __init__ i.e. the arguments passed to __init__), also the hyperparameters saved by save_hyperparameters() are included in model checkpoints, regardless of the logger argument. logger=True ensures init params will also be logged by loggers.
         self.save_hyperparameters(logger=False)
+        # self.save_hyperparameters(logger=False, ignore=["net"])
 
         self.net = net
 
@@ -56,11 +57,15 @@ class BratsLitModule(LightningModule):
         :param batch_idx: The index of the current batch
         :return: A tensor of losses between model predictions and targets
         """
-        
         X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
         logits = self(X) # equivalent to self.forward(X)
         loss = self.dice_loss_fn(logits, Y) # logits of shape [batch, 4, 128, 240, 240] and loss_fn convertes Y to one-hot resulting the same shape as logits.
+        loss.requires_grad_(True) # incase of transferring weights from pretrained checkpoint, need to set requires_grad=True for loss function.  # boolean attribute, not a method. so, requires_grad_(True), and not the requires_grad(True)
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True, logger=True) # If logger=False, it (train_loss) won't be logged into csv file or TensorBoard depending upon logger=csv is used or something else.
+
+        # Debugging
+        # print(f"logits requires_grad: {logits.requires_grad}")
+        # print(f"loss requires_grad: {loss.requires_grad}")
 
         # Log predicted_mask of train samples to wandb
         predicted_class_labels_train = torch.argmax(logits, dim=1, keepdim=True)

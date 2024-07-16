@@ -19,7 +19,7 @@ seed: 12345
 
 trainer:
   min_epochs: 1
-  max_epochs: 3
+  max_epochs: 50
   gradient_clip_val: 0.5
   accelerator: gpu
   # devices: [0]
@@ -44,7 +44,7 @@ model:
 data:
   _target_: src.data.brats_datamodule.BratsDataModule
   # data_dir: ${paths.data_dir}
-  data_dir: "C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\utilities\\stacked"
+  data_dir: "C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset"
   batch_size: 1
   num_workers: 0
   # pin_memory: True
@@ -54,6 +54,7 @@ logger:
     project: "BraTS_MedNeXt_Server"
     tags: ${tags}
     # name: ${experiment_name}
+    # name: "${hydra.job.id}" # or wandb.run.id
     mode: "offline"
     
 
@@ -62,8 +63,16 @@ callbacks:
     dirpath: ${paths.output_dir}/checkpoints
     monitor: val_score
     filename: best-checkpoint
-    save_top_k: 1
+    save_top_k: 3
     mode: "max"
     save_last: True
 
   early_stopping: null
+
+
+# Adding ckpt_path, for resuming training or evaluation
+ckpt_path: null
+# ckpt_path: "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5 - Copy\\best-checkpoint_spark_himal.ckpt"
+
+# Adding pretrained_ckpt_path for finetuning
+ckpt_path_for_finetuning: "D:\\BrainHack\\hydra\\spark_himalaya_git\\logs\\train\\runs\\2024-07-12_13-26-22\\checkpoints\\best-checkpoint.ckpt"
