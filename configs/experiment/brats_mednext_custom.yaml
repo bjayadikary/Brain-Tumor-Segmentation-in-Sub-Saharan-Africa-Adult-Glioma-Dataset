@@ -80,4 +80,5 @@ ckpt_path: null
 # ckpt_path: "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5 - Copy\\best-checkpoint_spark_himal.ckpt"
 
 # Adding pretrained_ckpt_path for finetuning
-ckpt_path_for_finetuning: "D:\\BrainHack\\hydra\\spark_himalaya_git\\logs\\train\\runs\\2024-07-12_13-26-22\\checkpoints\\best-checkpoint.ckpt"
+ckpt_path_for_finetuning: null
+# ckpt_path_for_finetuning: "D:\\BrainHack\\hydra\\spark_himalaya_git\\logs\\train\\runs\\2024-07-12_13-26-22\\checkpoints\\best-checkpoint.ckpt"
