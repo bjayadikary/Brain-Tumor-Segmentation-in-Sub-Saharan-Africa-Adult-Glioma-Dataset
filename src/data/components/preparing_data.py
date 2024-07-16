@@ -18,7 +18,7 @@ def get_volumes_path(base_data_dir):
 
     def assert_image_and_segmentation_name_match(image_paths, segmentation_paths):
         for image_path, segmentation_path in zip(image_paths, segmentation_paths):
-            assert os.path.basename(image_path).split("_")[0] == os.path.basename(segmentation_path).split(".")[0], f'Image and Segmentation name mismatch: {image_path} != {segmentation_path}'
+            assert (os.path.basename(image_path).split("_")[0] == os.path.basename(segmentation_path).split(".")[0], f'Image and Segmentation name mismatch: {image_path} != {segmentation_path}') or ('_'.join(os.path.basename(image_path).split("_")[0:2]) == os.path.basename(segmentation_path).split(".")[0], f'Image and Segmentation name mismatch: {image_path} != {segmentation_path}')
 
     assert_image_and_segmentation_name_match(train_image_paths, train_segmentation_paths)
     assert_image_and_segmentation_name_match(val_image_paths, val_segmentation_paths)

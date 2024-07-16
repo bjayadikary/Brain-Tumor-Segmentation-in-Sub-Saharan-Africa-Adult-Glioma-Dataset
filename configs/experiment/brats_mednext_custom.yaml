@@ -13,7 +13,7 @@ defaults:
 # all parameters below will be merged with parameters from default configurations set above
 # this allows you to overwrite only specified parameters
 
-tags: ["brats", "mednext", "SSA"]
+tags: ["brats", "mednext"]
 
 seed: 12345
 
@@ -37,7 +37,7 @@ model:
     _target_: src.models.components.mednext.MedNeXt.MedNeXt # points to the MedNeXt class in MedNeXt.py file, which is under mednext folder
     in_channels: 4
     n_classes: 4
-    n_channels: 6
+    n_channels: 4
     exp_r: 2
     kernel_size: 3
     deep_supervision: False
@@ -49,16 +49,21 @@ model:
 data:
   _target_: src.data.brats_datamodule.BratsDataModule
   # data_dir: ${paths.data_dir}
+<<<<<<< HEAD
   data_dir: "/mnt/Enterprise2/shirshak/SPARK_BIJAY_CODE/Spark_Himalaya/stacked"
+=======
+  data_dir: "C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset"
+>>>>>>> 25e51585a304418d90dba468ec63468c599db960
   batch_size: 1
   num_workers: 0
   # pin_memory: True
 
 logger:
   wandb:
-    project: "BraTS_SSA_MedNeXt_Server"
+    project: "BraTS_MedNeXt_Server"
     tags: ${tags}
     # name: ${experiment_name}
+    # name: "{now:%Y-%m-%d_%H-%M-%S}_{hydra.job.id}"
     mode: "offline"
     
 
@@ -72,3 +77,12 @@ callbacks:
     save_last: True
 
   early_stopping: null
+
+
+# Adding ckpt_path to our config, for evaluation
+ckpt_path: null
+# ckpt_path: "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5 - Copy\\best-checkpoint_spark_himal.ckpt"
+
+# Adding pretrained_ckpt_path for finetuning
+ckpt_path_for_finetuning: null
+# ckpt_path_for_finetuning: "D:\\BrainHack\\hydra\\spark_himalaya_git\\logs\\train\\runs\\2024-07-12_13-26-22\\checkpoints\\best-checkpoint.ckpt"
