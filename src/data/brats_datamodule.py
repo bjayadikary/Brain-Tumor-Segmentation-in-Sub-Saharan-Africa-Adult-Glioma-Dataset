@@ -3,7 +3,6 @@ import torch
 # from torch import device
 # from torch._C import device
 from torch.utils.data import DataLoader
-from monai.transforms import Compose
 from lightning import LightningDataModule
 from .components.preparing_data import get_volumes_path
 # from .components.preparing_data import BratsDataset
