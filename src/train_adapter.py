@@ -66,33 +66,34 @@ def train(cfg: DictConfig) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         pretrained_checkpoint = torch.load(cfg.ckpt_path_for_finetuning)
         
         # Changing the keys in pretrained_checkpoint to match the keys in model_with_adapter_state_dict
-        # for layer_name in list(pretrained_checkpoint['state_dict'].keys()):
-        #     if ('dec_block' in layer_name) or ('bottleneck' in layer_name) or ('enc_block' in layer_name):
-        #         # net.enc_block_0.0.conv1.weight  -->  net.enc_block_0.0.0.conv1.weight
-        #         # net.bottleneck.0.conv1.weight  -->  net.bottleneck.0.0.conv1.weight
-        #         # net.dec_block_2.1.norm.bias  -->  net.dec_block_2.0.1.norm.bias
+        for layer_name in list(pretrained_checkpoint['state_dict'].keys()):
+            if ('dec_block' in layer_name) or ('bottleneck' in layer_name) or ('enc_block' in layer_name):
+                # net.enc_block_0.0.conv1.weight  -->  net.enc_block_0.0.0.conv1.weight
+                # net.bottleneck.0.conv1.weight  -->  net.bottleneck.0.0.conv1.weight
+                # net.dec_block_2.1.norm.bias  -->  net.dec_block_2.0.1.norm.bias
                 
-        #         layer_name_split = layer_name.split(".")
-        #         layer_name_split.insert(2, "0")
-        #         new_layer_name = ".".join(layer_name_split)
-        #         print("Old layer_name: ", layer_name, "New layer name", new_layer_name)
+                layer_name_split = layer_name.split(".")
+                layer_name_split.insert(2, "0")
+                new_layer_name = ".".join(layer_name_split)
+                # print("Old layer_name: ", layer_name, "New layer name", new_layer_name)
 
-        #         # deletes the respective key, returns the associated value of that old key
-        #         layer_values = pretrained_checkpoint['state_dict'].pop(layer_name)
+                # deletes the respective key, returns the associated value of that old key
+                layer_values = pretrained_checkpoint['state_dict'].pop(layer_name)
 
-        #         # assign the returned value to the new_layer_name
-        #         pretrained_checkpoint['state_dict'][new_layer_name] = layer_values
-        #     else:
-        #         pass
+                # assign the returned value to the new_layer_name
+                pretrained_checkpoint['state_dict'][new_layer_name] = layer_values
+            else:
+                pass
             
         # assert if the len in new_layer_name (keys) in pretrained_checkpoint['state_dict'] matches those in new model with adapter state_dict, except the fully connected adapter's weights and biases
-        assert len(list(pretrained_checkpoint['state_dict'].keys())) == len(list(x for x in model.state_dict().keys() if 'fc' not in x))
+        assert len(list(pretrained_checkpoint['state_dict'].keys())) == len(list(x for x in model.state_dict().keys() if 'fc' not in x and 'dice_loss' not in x))
 
         # assert if every modified key on pretrained_checkpoint state dict have match in new model with adapter state_dict
         count = 0
         for modified_key in pretrained_checkpoint['state_dict'].keys():
             if modified_key not in model.state_dict().keys():
                 count += 1
+                print(modified_key)
         assert count == 0
 
         # Load weights/biases (i.e.state_dict) from pretrained checkpoint to new model with adapter that match the layer names. strict=False ignores non-matching keys, allowing the model to load even if the state dictionary does not perfectly match the model

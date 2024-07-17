@@ -53,8 +53,6 @@ logger:
   wandb:
     project: "BraTS_MedNeXt_Server"
     tags: ${tags}
-    # name: ${experiment_name}
-    # name: "${hydra.job.id}" # or wandb.run.id
     mode: "offline"
     
 

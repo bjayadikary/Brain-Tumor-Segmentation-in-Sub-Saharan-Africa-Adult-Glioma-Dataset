@@ -322,7 +322,7 @@ def test_brats21_checkpoint_test(batch_size:int, capsys): # The capsys.disabled(
 
 
 @pytest.fixture
-def mednext_model_with_adapters():
+def mednext_model_with_adapters(): # custom model
     model = MedNeXtWithLinearAdapters(
         in_channels=4,
         n_classes=4,
@@ -403,4 +403,71 @@ def test_checkpoint_load_for_finetuning(mednext_model_with_adapters: torch.nn.Mo
     #     for name in new_state_dict.keys():
     #         print(name)
 
+
+@pytest.fixture
+def mednextv1_small_model_with_adapters(): # mednext_smallv1 model
+    model = MedNeXtWithLinearAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+        adapter_dim_ratio=0.25,
+    )
+    return model
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_brats21_checkpoint_load_for_finetuning(mednextv1_small_model_with_adapters: torch.nn.Module, batch_size:int, capsys):
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednextv1_small_model_with_adapters.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+
+    # Load the pretrained model checkpoint
+    pretrained_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5\\best-checkpoint_spark_himal.ckpt"
+    pretrained_checkpoint = torch.load(pretrained_ckpt_path)
+
+    # Initialize the new model with adapters
+    model_with_adapter = BratsLitModule(net=mednextv1_small_model_with_adapters, optimizer=optimizer, scheduler=scheduler)
+
+    # with capsys.disabled():
+    #     print(model_with_adapter.state_dict().keys())
+
+    # Changing the keys in pretrained_checkpoint to match the keys in model_with_adapter_state_dict
+    for layer_name in list(pretrained_checkpoint['state_dict'].keys()):
+        if 'dec_block' in layer_name or 'bottleneck' in layer_name or 'enc_block' in layer_name:
+            layer_name_split = layer_name.split(".")
+            layer_name_split.insert(2, "0")
+            new_layer_name = ".".join(layer_name_split)
+
+            # deletes the respective key, returns the associated value of that old key
+            layer_values = pretrained_checkpoint['state_dict'].pop(layer_name)
+            
+            # assign the returned value to the new_layer_name
+            pretrained_checkpoint['state_dict'][new_layer_name] = layer_values
+        else:
+            pass
+           
+    # assert if the len in new_layer_name (keys) in pretrained_checkpoint['state_dict'] matches those in model_with_adapter_state_dict, excpet the fully connected adapter's weights and biases
+    assert len(list(pretrained_checkpoint['state_dict'].keys())) == len(list(x for x in model_with_adapter.state_dict().keys() if 'fc' not in x and 'dice_loss' not in x))
     
+    # assert if every key on pretrained_checkpoint state dict is in model_with_adapter_state_dict
+    count = 0
+    for modified_key in pretrained_checkpoint['state_dict'].keys():
+        if modified_key not in model_with_adapter.state_dict().keys():
+            count +=1
+    assert count == 0
+
+    # Load weights/biases (i.e. state_dict) from pretrained checkpoint to new model with adapter that match the layer names. strict=False ignores non-matching keys, allowing the model to load even if the state dictionary does not perfectly match the model.
+    model_with_adapter.load_state_dict(pretrained_checkpoint['state_dict'], strict=False)
+
+    # Freeze all layers except the adapter layers
+    for name, param in model_with_adapter.named_parameters():
+        if 'dice_loss_fn' in name:
+            with capsys.disabled():
+                print(name)
+        if 'fc' not in name:
+            param.requires_grad = False
