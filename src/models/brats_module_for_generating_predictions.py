@@ -1,5 +1,8 @@
 from typing import Any, Dict, Tuple
 
+import os
+
+import nibabel as nib
 import torch
 import torchio as tio
 
@@ -14,7 +17,7 @@ import wandb
 from lightning.pytorch.loggers.wandb import WandbLogger
 
 
-class BratsLitModule(LightningModule):
+class BratsLitModuleG(LightningModule):
     """
     PyTorch Lightning module for training and evaluating models on the BRATS dataset.
     It implements 8 key methods of LightningModule
@@ -47,6 +50,7 @@ class BratsLitModule(LightningModule):
         :return: A tensor of logits of shape [BCDHW] -> [batch, 4, 155, 240, 240]
         """
         return self.net(X)
+        
 
     def training_step(self,
                       batch,
@@ -69,8 +73,8 @@ class BratsLitModule(LightningModule):
 
         # Log predicted_mask of train samples to wandb
         predicted_class_labels_train = torch.argmax(logits, dim=1, keepdim=True)
-        self.dice_score_fn_train(predicted_class_labels_train, Y)
-        self.log('train_score', self.dice_score_fn_train.aggregate().item(), on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        self.dice_score_fn_train(predicted_class_labels_train, Y) # computes the dice_score for the current batch and adds it to the internal accumulation of 'self.dice_score_fn_train'
+        self.log('train_score', self.dice_score_fn_train.aggregate().item(), on_step=True, on_epoch=True, prog_bar=True, logger=True) # .aggregate() computes the aggregated dice score from all batches that have been processed so far 
         self.dice_score_fn_train.reset()
 
         if batch_idx == 1: # Log only for the first batch to reduce the number of images logged
@@ -87,19 +91,39 @@ class BratsLitModule(LightningModule):
 
         X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
         val_logits = self(X)
-        predicted_class_labels_val = torch.argmax(val_logits, dim=1, keepdim=True) # val_logits of shape [batch, 4, D, H, W] {raw logits}, after argmax [batch, D, H, W] {0, 1, 2, 3}, since it takes argmax along the channels (or, the #classes)
-        sample_dice_list = self.dice_score_fn_val(predicted_class_labels_val, Y) # if batch_size is 2, then it gives 2 dice_scores. i.e. gives list of sample_wise dice_score here 2 samples so 2 dice_score, each averaged over the channels/classes.
+        predicted_class_labels_val = torch.argmax(val_logits, dim=1, keepdim=True) # val_logits of shape [batch, 4, D, H, W] {raw logits}, after argmax [batch, 1, D, H, W] {0, 1, 2, 3}, since it takes argmax along the channels (or, the #classes)
+        self.dice_score_fn_val(predicted_class_labels_val, Y)
 
-        # If batch_size==1, then sample_dice_list is equal to val_avg_dice.
-        val_avg_dice = self.dice_score_fn_val.aggregate().item() # gives batch dice_score; 2 dice_scores are aggregated into one 
-        self.log('val_score', val_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True) # When on_epoch=True, the values logged at each step are accumulated, and their average is computed and logged at the end of the epoch by pytorch lightning itself.
+        val_avg_dice = self.dice_score_fn_val.aggregate().item()
+        self.log('val_score', val_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True)
         self.dice_score_fn_val.reset()
 
         # Log predicted mask of val samples to wandb
         if batch_idx == 0:
             self.log_images(X, Y, predicted_class_labels_val, 'val', batch_idx)
-        # return sample_dice_list, val_avg_dice
 
+
+    # def test_step(self,
+    #               batch,
+    #             #   batch: Dict[str, torch.Tensor],
+    #               batch_idx: int) -> None:
+    #     """Perform a single test step on a batch of data from the test set"""
+        
+    #     X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
+    #     test_logits = self(X)
+    #     predicted_class_labels_test = torch.argmax(test_logits, dim=1, keepdim=True)
+    #     self.dice_score_fn_test(predicted_class_labels_test, Y)
+
+    #     test_avg_dice = self.dice_score_fn_test.aggregate().item()
+    #     self.log('test_score', test_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+    #     self.dice_score_fn_test.reset()
+
+    #     # Log predicted mask of test samples to wandb
+    #     if batch_idx == 5:
+    #         self.log_images(X, Y, predicted_class_labels_test, 'test', batch_idx)
+
+    # This function is particularly modified version of test_step() above for generating prediction segmentation of validation dataset for submission
+    # Need to change this function if we want to generate prediction segmentation for files without the ground segmentation mask
     def test_step(self,
                   batch,
                 #   batch: Dict[str, torch.Tensor],
@@ -107,9 +131,13 @@ class BratsLitModule(LightningModule):
         """Perform a single test step on a batch of data from the test set"""
         
         X, Y = batch['image'][tio.DATA], batch['mask'][tio.DATA]
+        # Need to ensure the X is input to the pretrained_model to generate the predictions
         test_logits = self(X)
         predicted_class_labels_test = torch.argmax(test_logits, dim=1, keepdim=True)
-        self.dice_score_fn_test(predicted_class_labels_test, Y)
+
+        # Generate the prediction segementation
+        self.generate_prediction_segmentation(predicted_class_labels_test, batch['mask_path'][0]) # batch['mask_path'] gives a list although it only has one item when batch_size is 1 # batch['mask_path'][0] gives 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset\\TestSegmentations\\BraTS-SSA-00002-000.nii.gz'
+        sample_dice_list = self.dice_score_fn_test(predicted_class_labels_test, Y)
 
         test_avg_dice = self.dice_score_fn_test.aggregate().item()
         self.log('test_score', test_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True)
@@ -118,6 +146,9 @@ class BratsLitModule(LightningModule):
         # Log predicted mask of test samples to wandb
         if batch_idx == 5:
             self.log_images(X, Y, predicted_class_labels_test, 'test', batch_idx)
+
+        return test_avg_dice, batch['mask_path'][0]
+
 
     # def on_validation_epoch_end(self) -> None:
     #     """Lightning hook that is called when a validation epoch ends"""
@@ -147,6 +178,50 @@ class BratsLitModule(LightningModule):
                 },
             }
         return {"optimizer": optimizer}
+    
+    def generate_prediction_segmentation(self, predicted_class_labels_test, mask_path):
+        # Define the output directory
+        output_dir = 'predictions_for_submission'
+        os.makedirs(output_dir, exist_ok=True) # exists_ok=True suppresses os error if directory already exists
+
+        # get case_id from mask_path
+        case_id = os.path.basename(mask_path) # 'BraTS-SSA-00126-000.nii.gz
+        case_id = case_id.split('-')[2]
+
+        # Define the output file path
+        file_path = os.path.join(output_dir, f'ssa_predicted_mask_{case_id}.nii.gz')
+
+        # save the predicted mask
+        predicted_class_labels_test_np = predicted_class_labels_test.cpu().numpy() # [batch, 1, D, H, W]
+
+        # Ensure the prediction is 3D and has the correct shape
+        if predicted_class_labels_test_np.ndim == 5:
+            assert predicted_class_labels_test_np.shape[:2] == (1, 1), 'The first two dimensions should be 1'
+            predicted_class_labels = np.squeeze(predicted_class_labels_test_np, axis=(0,1)) # [B, D, H, W]
+            assert predicted_class_labels.ndim == 3, 'The result should be a 3-dimensional array'
+        else:
+            raise ValueError(f"Unexpected prediction shape: {predicted_class_labels_test_np.shape}")
+
+        ### Post-processing to make the output dimensio of 240x240x155 and origin [0, -239, 0]
+        resize_transform = tio.Resize(target_shape=(240, 240, 155))
+
+        ## Create a torchio LabelMap from the prediction
+        predicted_mask = tio.LabelMap(tensor=torch.from_numpy(np.expand_dims(predicted_class_labels, axis=0)))
+        
+        ## Apply the resize transform
+        predicted_mask_resized = resize_transform(predicted_mask) # resized_array of shape [B, D, H, W]=>[1, 128,128,128]
+
+        ## Convert to numpy array and create NIfTI image
+        resized_array = predicted_mask_resized.tensor.numpy().astype(np.float32) # Using the tensor attribute to get the data
+        resized_array = np.squeeze(resized_array, axis=0) # Removing the Batch dimension => [D, H, W]
+        
+        ## Save the resized array as a nifty file
+        affine = np.eye(4) # Creates an identity affine transformation matrix
+        affine[:3, 3] = [0, -239, 0]
+        nifti_image = nib.Nifti1Image(resized_array, affine)
+        nib.save(nifti_image, file_path)
+        print('Nifti file successfully saved at ', file_path)
+
     
     def log_images(self, X, Y, predicted_class_labels, stage, batch_idx):
         # Convert tensors to numpy arrays for logging into wandb

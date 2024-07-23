@@ -65,7 +65,7 @@ class BratsDataModule(LightningDataModule):
         pass
 
     def setup(self, stage=None) -> None: # 'stage' arg is used to separate logic for 'fit' and 'test', runs across all GPUs and is safe to make state assignments
-        # Get paths to data volumes and segmentations
+        # Get paths to data volumes and segmentations. For now, test_image_paths and test_segmentation_paths also contains the validation dataset used for generating segmentations for validation submission
         train_image_paths, train_segmentation_paths, val_image_paths, val_segmentation_paths, test_image_paths, test_segmentation_paths = get_volumes_path(self.data_dir)
         
         # Instantiate Subject class and an empty list to accumulate all the subjects for training set
@@ -74,6 +74,7 @@ class BratsDataModule(LightningDataModule):
             train_subject = tio.Subject(
                 image = tio.ScalarImage(image_path),
                 mask = tio.LabelMap(segmentation_path),
+                mask_path = segmentation_path, # mask_path contains case_id which is required later in generating the prediction files. 
             )
             self.train_subjects.append(train_subject)
 
@@ -82,6 +83,7 @@ class BratsDataModule(LightningDataModule):
             val_subject = tio.Subject(
                 image = tio.ScalarImage(image_path),
                 mask = tio.LabelMap(segmentation_path),
+                mask_path = segmentation_path,
             )
             self.val_subjects.append(val_subject)
 
@@ -90,6 +92,8 @@ class BratsDataModule(LightningDataModule):
             test_subject = tio.Subject(
                 image = tio.ScalarImage(image_path),
                 mask = tio.LabelMap(segmentation_path),
+                mask_path = segmentation_path
+
             )
             self.test_subjects.append(test_subject)
 
@@ -129,7 +133,7 @@ class BratsDataModule(LightningDataModule):
             num_workers=self.hparams.num_workers,
             pin_memory=self.hparams.pin_memory,
             shuffle=False,
-            drop_last=True,
+            drop_last=False,
         )
     
     # def predict_dataloader(self) -> Any:
@@ -147,6 +151,7 @@ class BratsDataModule(LightningDataModule):
     def transfer_batch_to_device(self, batch: Any, device: torch.device, dataloader_idx: int) -> Any:
         batch['image'][tio.DATA] = batch['image'][tio.DATA].to(device)
         batch['mask'][tio.DATA] = batch['mask'][tio.DATA].to(device)
+        # batch['mask_path'] = batch['mask_path'].to(device)
         return batch
         # return super().transfer_batch_to_device(batch, device, dataloader_idx)
 

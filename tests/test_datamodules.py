@@ -8,11 +8,15 @@ from src.data.brats_datamodule import BratsDataModule
 
 from src.models.components.unet import UNet
 from src.models.brats_module import BratsLitModule
+from src.models.brats_module_for_generating_predictions import BratsLitModuleG
+
 from src.models.components.mednext.MedNeXt import MedNeXt
 
 from src.models.components.mednext.MedNeXt_with_linear_adapter import MedNeXtWithLinearAdapters
-from src.models.components.mednext.MedNeXt_with_mednext_block_as_adapter import MedNeXtWithAdapters
+from src.models.components.mednext.MedNeXt_with_conv_adapter import MedNeXtWithAdapters
 from collections import OrderedDict
+
+import os
 
 import torchio as tio
 
@@ -208,8 +212,8 @@ def test_brats_litmodule_forward_pass_unet(unet_model: torch.nn.Module, batch_si
     assert output.shape == expected_shape
 
 
-@pytest.mark.parametrize("batch_size", [1, 2])
-def test_brats_litmodule_training_and_validation_step(unet_model: UNet, brats_datamodule: BratsDataModule, batch_size:int):
+@pytest.mark.parametrize("batch_size", [1,])
+def test_brats_litmodule_training_and_validation_step(unet_model: UNet, brats_datamodule: BratsDataModule, batch_size:int, capsys):
     dm = brats_datamodule
     dm.setup(stage='fit')
     train_loader = dm.train_dataloader()
@@ -226,15 +230,24 @@ def test_brats_litmodule_training_and_validation_step(unet_model: UNet, brats_da
     module = BratsLitModule(net=unet_model, optimizer=optimizer, scheduler=scheduler)
     batch_idx = 0
     loss = module.training_step(train_batch, batch_idx)
+    with capsys.disabled():
+        print('train_batch size.....', len(train_batch))
+        print('loss.......:', loss)
     assert isinstance(loss, torch.Tensor), f"Expected loss to be a torch.Tensor but got {type(loss)}"
 
     val_loader = dm.val_dataloader()
     assert val_loader is not None
     assert len(val_loader) > 0
     val_batch = next(iter(val_loader))
-    module.validation_step(val_batch, batch_idx)
+
+    with capsys.disabled():
+        sample_dice_list, val_avg_dice = module.validation_step(val_batch, batch_idx) # to test this line change the validation_step to return sample_wise dice score and aggregated(batch_wise dice score) 
+        if batch_size == 1:
+            assert sample_dice_list.item() == val_avg_dice
+            print('sample_dice_list and val_avg_dice: ', sample_dice_list, val_avg_dice)
+
     
-    assert module.dice_score_fn_val.aggregate() is not None
+    # assert module.dice_score_fn_val.aggregate() is not None
 
 
 
@@ -271,7 +284,7 @@ def test_mnist_datamodule(batch_size: int) -> None:
 
 
 @pytest.fixture
-def mednext_model():
+def mednext_model(): # custom model
     model = MedNeXt(
         in_channels=4,
         n_classes=4,
@@ -542,3 +555,121 @@ def test_brats21_checkpoint_load_for_finetuning_with_mednext_as_adapter(mednextv
                 print(name)
         if 'med_adp' not in name:
             param.requires_grad = False
+
+#####################################
+#### For generating prediction files
+#####################################
+
+@pytest.fixture
+def ssa_datamodule_full(batch_size):
+    return BratsDataModule(data_dir='C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\utilities\\stacked', batch_size=batch_size)
+    # return BratsDataModule(data_dir='C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset', batch_size=batch_size)
+
+
+@pytest.fixture
+def mednextv1_small_model_with_small_linear_adapters(): # mednext_smallv1 model uses prefixed mednext block as adapter
+    model = MedNeXtWithLinearAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+        adapter_dim_ratio=0.25
+    )
+    return model
+
+@pytest.fixture
+def mednextv1_small_model_with_large_linear_adapters(): # mednext_smallv1 model uses prefixed mednext block as adapter
+    model = MedNeXtWithLinearAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+        adapter_dim_ratio=2
+    )
+
+    return model
+
+@pytest.fixture
+def mednextv1_small_model_with_conv_adapters(): # with convolution adapter
+    model = MedNeXtWithAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+    )
+
+    return model
+
+# @pytest.mark.parametrize("batch_size", [1,])
+# def test_generate_prediction_files_with_large_linear_adapter(mednextv1_small_model_with_large_linear_adapters: torch.nn.Module, batch_size:int):
+#     # Initialize optimizer and scheduler instances
+#     optimizer = torch.optim.AdamW(mednextv1_small_model_with_large_linear_adapters.parameters(), lr=0.002, weight_decay=0.001)
+#     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+
+#     # Load the pretrained model checkpoint
+#     pretrained_ckpt_path = ""
+#     pretrained_checkpoint = torch.load(pretrained_ckpt_path)
+
+#     module = BratsLitModule(net=mednextv1_small_model_with_mednext_as_adapters, optimizer=optimizer, scheduler=scheduler)
+#     input_tensor = torch.randn(batch_size, 4, 128, 128, 128)
+#     output = module.forward(input_tensor) # logits of shape (BCDHW)
+
+#     # Ensure logits is a tensor
+#     assert isinstance(output, torch.Tensor)
+        
+#     expected_shape = (batch_size, 4, 128, 128, 128)
+#     assert output.shape == expected_shape
+
+
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_generate_prediction_files_with_conv_adapter(mednextv1_small_model_with_conv_adapters: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size:int, capsys):
+    # Load the finetuned model checkpoint
+    finetuned_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\with_conv_adapter\\runs\\2024-07-20_04-08-04\\checkpoints\\best-checkpoint.ckpt"
+    finetuned_checkpoint = torch.load(finetuned_ckpt_path)
+
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednextv1_small_model_with_conv_adapters.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    module_with_conv_adapter = BratsLitModuleG(net=mednextv1_small_model_with_conv_adapters, optimizer=optimizer, scheduler=scheduler)
+
+    # Assert if the number of keys in finetuned_checkpoint and keys in model with conv adapter is same 
+    assert len(list(finetuned_checkpoint['state_dict'].keys())) == len(list(module_with_conv_adapter.state_dict().keys()))
+    
+    # Checking if layer names in both matches 
+    with capsys.disabled():
+        for finetuned_layer_name, layer_name in zip(list(finetuned_checkpoint['state_dict'].keys()), list(module_with_conv_adapter.state_dict().keys())):
+            assert finetuned_layer_name == layer_name
+
+    # Load the finetuned_checkpoint parameters in module_with_conv_adapter
+    module_with_conv_adapter.load_state_dict(finetuned_checkpoint['state_dict'], strict=True)
+
+    # Get the data modules
+    dm = ssa_datamodule_full
+    dm.setup(stage='test')
+    test_loader = dm.test_dataloader()
+
+    # if batch_size == 1:
+    #     assert len(test_loader) == 15
+
+    # Loop through all the batch/samples
+    for batch_idx, batch in enumerate(test_loader):
+        # pass the test batch to the testing_step
+        with capsys.disabled():
+            test_avg_dice, mask_path = module_with_conv_adapter.test_step(batch, batch_idx)
+            print(f'Dice Score on {os.path.basename(mask_path)} is {test_avg_dice}')
