@@ -27,30 +27,51 @@ class BratsDataModule(LightningDataModule):
 
         self.data_dir = data_dir # Directory for data
         self.batch_size = batch_size 
-
+    
         # data transformations
         self.train_transform = tio.Compose([ # input of shape (B, C, 240, 240, 155) goes through it
             tio.ToCanonical(), # Ensures same orientation of RAS
+            tio.Clamp(out_min=-1000,out_max=1900),
+            tio.ZNormalization() ,
+            # tio.RescaleIntensity(percentiles=((0.5,0.995))),
+            tio.Resample((1,1,1)),
+            #tio.CropOrPad((180,180,180)),
             tio.Resize(target_shape=(128, 128, 128)), # this transform should not be used as it will deform the physical object by scaling anistropically along the different dimensions. The solution to change an image size is typically applying Resample and CropOrPad.
             # tio.Resample(1),
             # tio.CropOrPad(target_shape=(256, 256, 256), mask_name='mask'),
-            tio.ZNormalization() # Ensures resulting distribution of zero mean and unit SD.
+            tio.RandomFlip(axes=("LR")),
+            tio.OneOf({
+                tio.RandomAffine(degrees=15):0.3,
+                tio.RandomAffine(translation=10):0.2,
+                #tio.RandomAffine(scales=(1.5,1.5,1.5)):0.3,
+                tio.RandomAffine(degrees=10,translation=5):0.2
+            }),
+            tio.OneOf({
+                tio.RandomNoise(mean=0.25):0.5,
+                tio.RandomGamma(p=0.5):0.5
+            })
+            
         ]) # Output of shape (BCHWD) -> (B, 4, 256, 256, 256)
 
         self.val_transform = tio.Compose([
             tio.ToCanonical(),
+            tio.Resample((1,1,1)),
+            tio.ZNormalization(),
+            #tio.CropOrPad((180,180,180)),
             tio.Resize(target_shape=(128, 128, 128)),
             # tio.Resample(1),
             # tio.CropOrPad(target_shape=(256, 256, 256), mask_name='mask'),
-            tio.ZNormalization(),
+            
         ])
 
         self.test_transform = tio.Compose([
             tio.ToCanonical(),
+            tio.Resample((1,1,1)),
+            #tio.CropOrPad((180,180,180)),
             tio.Resize(target_shape=(128, 128, 128)),
             # tio.Resample(1),
             # tio.CropOrPad(target_shape=(256, 256, 256), mask_name='mask'),
-            tio.ZNormalization()
+            #tio.ZNormalization()
         ])
 
         self.train_subjects = []
