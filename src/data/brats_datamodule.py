@@ -74,7 +74,7 @@ class BratsDataModule(LightningDataModule):
             train_subject = tio.Subject(
                 image = tio.ScalarImage(image_path),
                 mask = tio.LabelMap(segmentation_path),
-                mask_path = segmentation_path, # mask_path contains case_id which is required later in generating the prediction files. 
+                path = image_path, # path contains case_id which is required later in generating the prediction files. 
             )
             self.train_subjects.append(train_subject)
 
@@ -83,7 +83,7 @@ class BratsDataModule(LightningDataModule):
             val_subject = tio.Subject(
                 image = tio.ScalarImage(image_path),
                 mask = tio.LabelMap(segmentation_path),
-                mask_path = segmentation_path,
+                path = image_path,
             )
             self.val_subjects.append(val_subject)
 
@@ -92,7 +92,7 @@ class BratsDataModule(LightningDataModule):
             test_subject = tio.Subject(
                 image = tio.ScalarImage(image_path),
                 mask = tio.LabelMap(segmentation_path),
-                mask_path = segmentation_path
+                path = image_path
 
             )
             self.test_subjects.append(test_subject)
@@ -151,7 +151,7 @@ class BratsDataModule(LightningDataModule):
     def transfer_batch_to_device(self, batch: Any, device: torch.device, dataloader_idx: int) -> Any:
         batch['image'][tio.DATA] = batch['image'][tio.DATA].to(device)
         batch['mask'][tio.DATA] = batch['mask'][tio.DATA].to(device)
-        # batch['mask_path'] = batch['mask_path'].to(device)
+        # batch['path'] = batch['path'].to(device)
         return batch
         # return super().transfer_batch_to_device(batch, device, dataloader_idx)
 

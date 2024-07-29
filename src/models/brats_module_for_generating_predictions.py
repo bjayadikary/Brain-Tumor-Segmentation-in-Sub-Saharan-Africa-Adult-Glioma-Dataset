@@ -1,6 +1,7 @@
 from typing import Any, Dict, Tuple
 
 import os
+import datetime
 
 import nibabel as nib
 import torch
@@ -136,18 +137,20 @@ class BratsLitModuleG(LightningModule):
         predicted_class_labels_test = torch.argmax(test_logits, dim=1, keepdim=True)
 
         # Generate the prediction segementation
-        self.generate_prediction_segmentation(predicted_class_labels_test, batch['mask_path'][0]) # batch['mask_path'] gives a list although it only has one item when batch_size is 1 # batch['mask_path'][0] gives 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset\\TestSegmentations\\BraTS-SSA-00002-000.nii.gz'
-        sample_dice_list = self.dice_score_fn_test(predicted_class_labels_test, Y)
+        self.generate_prediction_segmentation(predicted_class_labels_test, batch['path'][0]) # batch['mask_path'] gives a list although it only has one item when batch_size is 1 # batch['mask_path'][0] gives 'C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset\\TestSegmentations\\BraTS-SSA-00002-000.nii.gz'
+        # sample_dice_list = self.dice_score_fn_test(predicted_class_labels_test, Y)
 
-        test_avg_dice = self.dice_score_fn_test.aggregate().item()
-        self.log('test_score', test_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True)
-        self.dice_score_fn_test.reset()
+        # test_avg_dice = self.dice_score_fn_test.aggregate().item()
+        # self.log('test_score', test_avg_dice, on_step=True, on_epoch=True, prog_bar=True, logger=True)
+        # self.dice_score_fn_test.reset()
 
         # Log predicted mask of test samples to wandb
-        if batch_idx == 5:
-            self.log_images(X, Y, predicted_class_labels_test, 'test', batch_idx)
+        # if batch_idx == 5:
+            # self.log_images(X, Y, predicted_class_labels_test, 'test', batch_idx)
 
-        return test_avg_dice, batch['mask_path'][0]
+        # return test_avg_dice, batch['mask_path'][0]
+
+        # return batch['mask_path'][0]
 
 
     # def on_validation_epoch_end(self) -> None:
@@ -179,17 +182,18 @@ class BratsLitModuleG(LightningModule):
             }
         return {"optimizer": optimizer}
     
-    def generate_prediction_segmentation(self, predicted_class_labels_test, mask_path):
+    def generate_prediction_segmentation(self, predicted_class_labels_test, path):
+        
         # Define the output directory
-        output_dir = 'predictions_for_submission'
+        output_dir = os.path.join('predictions_for_submission')
         os.makedirs(output_dir, exist_ok=True) # exists_ok=True suppresses os error if directory already exists
 
         # get case_id from mask_path
-        case_id = os.path.basename(mask_path) # 'BraTS-SSA-00126-000.nii.gz
-        case_id = case_id.split('-')[2]
+        case_id = os.path.basename(path) # 'BraTS-SSA-00125-000_stacked.nii.gz'
+        case_id = '-'.join(case_id.split('_')[0].split('-')[-2:]) # 00125-000
 
         # Define the output file path
-        file_path = os.path.join(output_dir, f'ssa_predicted_mask_{case_id}.nii.gz')
+        file_path = os.path.join(output_dir, f'{case_id}.nii.gz')
 
         # save the predicted mask
         predicted_class_labels_test_np = predicted_class_labels_test.cpu().numpy() # [batch, 1, D, H, W]
@@ -220,7 +224,7 @@ class BratsLitModuleG(LightningModule):
         affine[:3, 3] = [0, -239, 0]
         nifti_image = nib.Nifti1Image(resized_array, affine)
         nib.save(nifti_image, file_path)
-        print('Nifti file successfully saved at ', file_path)
+        print(f'Nifti file of {case_id} successfully saved at ', file_path)
 
     
     def log_images(self, X, Y, predicted_class_labels, stage, batch_idx):
@@ -276,4 +280,4 @@ class BratsLitModuleG(LightningModule):
 
 
 if __name__ == "__main__":
-    _ = BratsLitModule(None, None, None, None)
+    _ = BratsLitModuleG(None, None, None, None)

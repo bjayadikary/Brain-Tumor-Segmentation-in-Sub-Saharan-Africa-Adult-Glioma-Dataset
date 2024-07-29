@@ -2,13 +2,13 @@ _target_: src.models.brats_module.BratsLitModule
 
 optimizer:
   _target_: torch.optim.AdamW
-  _partial_: true
+  _partial_: True
   lr: 0.002
   weight_decay: 0.001 # L2 Penalty to prevent overfitting by penalizing large weights in the model
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
+  _partial_: True
   factor: 0.1 # Specifies the factor by which the learning rate will be reduced.
   patience: 5 # If the monitored metric (i.e. val_score) is not increased in the 5 consecutive epochs, the learning_rate will be reduced by the specified factor
 
