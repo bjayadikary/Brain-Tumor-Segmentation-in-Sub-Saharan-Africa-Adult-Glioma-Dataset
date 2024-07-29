@@ -13,7 +13,8 @@ from src.models.brats_module_for_generating_predictions import BratsLitModuleG
 from src.models.components.mednext.MedNeXt import MedNeXt
 
 from src.models.components.mednext.MedNeXt_with_linear_adapter import MedNeXtWithLinearAdapters
-from src.models.components.mednext.MedNeXt_with_conv_adapter import MedNeXtWithAdapters
+from src.models.components.mednext.MedNeXt_with_conv_adapter import MedNeXtWithAdapters # sequential adapter
+from src.models.components.mednext.MedNeXt_with_parallel_conv_adapter import MedNeXtWithParallelAdapters # parallel adapter
 from collections import OrderedDict
 
 import os
@@ -310,9 +311,65 @@ def test_brats_litmodule_forward_pass_mednext(mednext_model: torch.nn.Module, ba
     assert output.shape == expected_shape
 
 
-########################
-### Testing Checkpoints
-########################
+########################################
+### Checking Deep Supervision in MedNeXt
+########################################
+@pytest.fixture
+def mednext_small_without_deep_supervision():
+    model = MedNeXt(
+        in_channels=4,
+        n_classes=4,
+        n_channels=4,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2]
+    )
+    return model
+
+@pytest.fixture
+def mednext_small_with_deep_supervision():
+    model = MedNeXt(
+        in_channels=4,
+        n_classes=4,
+        n_channels=4,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=True,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2]
+    )
+    return model
+
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_mednext_small_deep_supervision(mednext_small_without_deep_supervision: torch.nn.Module, mednext_small_with_deep_supervision, batch_size:int, capsys):
+    # Initialize optimizer and scheduler instances
+    optimizer_without_supervision = torch.optim.AdamW(mednext_small_without_deep_supervision.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler_without_supervision = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_without_supervision)
+
+    optimizer_with_supervision = torch.optim.AdamW(mednext_small_with_deep_supervision.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler_with_supervision = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer_with_supervision)
+ 
+    
+    model_without_supervision = BratsLitModule(mednext_small_without_deep_supervision, optimizer=optimizer_without_supervision, scheduler=scheduler_without_supervision)
+    model_with_supervision = BratsLitModule(mednext_small_with_deep_supervision, optimizer=optimizer_without_supervision, scheduler=scheduler_with_supervision)
+
+    # Check the layer names in mednext without supervision 
+    for name, param in model_with_supervision.named_parameters():
+        with capsys.disabled():
+            print(name)
+
+
+
+    
+
+######################################
+### Testing Checkpoints and Adapters
+######################################
 @pytest.mark.parametrize("batch_size", [1,])
 def test_custom_checkpoint_test(batch_size:int, capsys):
     # Load the checkpoint
@@ -350,6 +407,99 @@ def mednext_model_with_adapters(): # custom model
         adapter_dim_ratio=0.25,
     )
     return model
+
+@pytest.fixture
+def mednext_model_with_convnext_parallel_adapters():
+    model = MedNeXtWithParallelAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+    )
+    return model
+
+@pytest.fixture
+def mednext_model_with_convnext_sequential_adapters():
+    model = MedNeXtWithAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+    )
+    return model
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_pretrained_checkpoint_and_parallel_adapter(mednext_model_with_convnext_parallel_adapters: torch.nn.Module, mednext_model_with_convnext_sequential_adapters: torch.nn.Module, batch_size: int, capsys):
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednext_model_with_convnext_parallel_adapters.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+
+    # Load the pretrained model checkpoint
+    pretrained_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5\\best-checkpoint_spark_himal.ckpt"
+    pretrained_checkpoint = torch.load(pretrained_ckpt_path)
+
+    # Initialize the new model with adapters
+    model_parallel = BratsLitModule(net=mednext_model_with_convnext_parallel_adapters, optimizer=optimizer, scheduler=scheduler)
+    model_sequential = BratsLitModule(net=mednext_model_with_convnext_sequential_adapters, optimizer=optimizer, scheduler=scheduler)
+    
+    # assert len(list([x for x in model_parallel.state_dict().keys() if 'adapter_block' not in x])) == len(list([x for x in model_sequential.state_dict().keys() if 'med_adp' not in x])) == len(list(pretrained_checkpoint['state_dict'].keys())), 'The total keys in sequential and parallel ways do not match'
+    with capsys.disabled():
+        # Changing the keys in pretrained_checkpoint to match the keys in model with parallel adapter
+        for layer_name in list(pretrained_checkpoint['state_dict'].keys()):
+            if 'enc_block' in layer_name or 'dec_block' in layer_name or 'bottleneck' in layer_name: # net.enc_block_0.0.conv1.weight -> net.enc_block_0.mednext_block.0.conv1.weight
+                layer_name_split = layer_name.split(".")
+                layer_name_split.insert(2, "mednext_block")
+                new_layer_name = ".".join(layer_name_split)
+
+                # deletes the repective key, returns the associated value of that old key 
+                layer_values = pretrained_checkpoint['state_dict'].pop(layer_name)
+
+                # assign the returned value to the new_layer_name
+                pretrained_checkpoint['state_dict'][new_layer_name] = layer_values
+            
+            else:
+                pass
+
+    # assert if the total keys in pretrained_checkpoint with modified layer name matches those in model with parallel adapter state_dict, except adapter_block's weightes and biases
+    assert len(list(pretrained_checkpoint['state_dict'].keys())) == len(list(x for x in model_parallel.state_dict().keys() if 'adapter_block' not in x and 'dice_loss_fn' not in x))
+    
+    # assert if every key on pretrained_checkpoint state dict is in model with parallel adapter
+    with capsys.disabled():
+        count = 0
+        for modified_key in pretrained_checkpoint['state_dict'].keys():
+            if modified_key not in model_parallel.state_dict().keys():
+                count += 1
+    assert count == 0, "There's some key in pretrained_checkpoint which doesn't have matching key in model"
+
+    # Load weights/biases (i.e. state_dict) from pretrained checkpoint to new model with adapter that match the layer names. 
+    missing_keys, unexpected_keys = model_parallel.load_state_dict(pretrained_checkpoint['state_dict'], strict=False)
+    
+    assert missing_keys == 73, "Some keys in checkpoint do not have matching keys in model" # 72 keys in model has to be of adapter which has no values from checkpoint and dice_loss_fn is also not in checkpoint
+    
+    with capsys.disabled():
+        print(f"Missiing keys: ", len(missing_keys))
+        print(f"Unexpected keys: ", len(unexpected_keys))
+
+    # Freeze all layers except the adapter layers
+    for name, param in model_parallel.named_parameters():
+        if 'adapter_block' not in name:
+            param.requires_grad = False
+    
+    # verify which parameters are trainable
+    with capsys.disabled():
+        for name, param in model_parallel.named_parameters():
+            print(f"{name}: requires_grad={param.requires_grad}")
+
 
 @pytest.mark.parametrize("batch_size", [1,])
 def test_checkpoint_load_for_finetuning(mednext_model_with_adapters: torch.nn.Module, batch_size:int, capsys):
@@ -556,6 +706,13 @@ def test_brats21_checkpoint_load_for_finetuning_with_mednext_as_adapter(mednextv
         if 'med_adp' not in name:
             param.requires_grad = False
 
+###############################################################
+#### For visualizing preprocessing & transformations applied
+################################################################
+
+
+
+
 #####################################
 #### For generating prediction files
 #####################################
@@ -564,6 +721,22 @@ def test_brats21_checkpoint_load_for_finetuning_with_mednext_as_adapter(mednextv
 def ssa_datamodule_full(batch_size):
     return BratsDataModule(data_dir='C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\utilities\\stacked', batch_size=batch_size)
     # return BratsDataModule(data_dir='C:\\Users\\lenovo\\BraTS2023_SSA_modified_structure\\stacked_subset', batch_size=batch_size)
+
+
+@pytest.fixture
+def mednextv1_small_model(): # mednext_smallv1 model
+    model = MedNeXt(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2],
+    )
+    return model
 
 
 @pytest.fixture
@@ -635,12 +808,108 @@ def mednextv1_small_model_with_conv_adapters(): # with convolution adapter
 #     expected_shape = (batch_size, 4, 128, 128, 128)
 #     assert output.shape == expected_shape
 
+@pytest.mark.parametrize("batch_size", [1,]) # using model trained on brats2021 and validating on SSA
+def test_generate_prediction_files_with_pretrained_model_from_brats2021(mednextv1_small_model: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size: int, capsys):
+    # Load the model checkpoint trained on brats2021
+    ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5\\best-checkpoint_spark_himal.ckpt"
+    checkpoint = torch.load(ckpt_path)
+
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednextv1_small_model.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    module = BratsLitModuleG(net=mednextv1_small_model, optimizer=optimizer, scheduler=scheduler)
+
+    # Assert if number of keys in loaded checkpoint and keys in module is same
+    assert len(list(checkpoint['state_dict'].keys())) == len(list([x for x in module.state_dict().keys() if 'dice_loss_fn' not in x]))
+    
+    for checkpoint_layer_name, module_layer_name in zip(list(checkpoint['state_dict']), list([x for x in module.state_dict().keys()])):
+        assert checkpoint_layer_name == module_layer_name
+
+    # Load checkpoint parameters in module
+    module.load_state_dict(checkpoint['state_dict'], strict=False)
+
+    # Get the data modules
+    dm = ssa_datamodule_full
+    dm.setup(stage='test')
+    test_loader = dm.test_dataloader()
+
+    # Loop through all batch/samples
+    for batch_idx, batch in enumerate(test_loader):
+        # pass the test batch to the testing step
+        with capsys.disabled():
+            module.test_step(batch, batch_idx)
 
 
-@pytest.mark.parametrize("batch_size", [1,])
+@pytest.mark.parametrize("batch_size", [1,]) # using model trained on SSA itself
+def test_generate_prediction_files_without_finetuned(mednextv1_small_model: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size: int, capsys):
+    # Load the model checkpoint trained on SSA dataset only
+    ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\comfy-universe-6\\best-checkpoint.ckpt"
+    checkpoint = torch.load(ckpt_path)
+
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednextv1_small_model.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    module = BratsLitModuleG(net=mednextv1_small_model, optimizer=optimizer, scheduler=scheduler)
+
+    # Assert if number of keys in loaded checkpoint and keys in module is same
+    assert len(list(checkpoint['state_dict'].keys())) == len(list([x for x in module.state_dict().keys() if 'dice_loss_fn' not in x]))
+    
+    with capsys.disabled():
+        for checkpoint_layer_name, module_layer_name in zip(list(checkpoint['state_dict']), list([x for x in module.state_dict().keys()])):
+            assert checkpoint_layer_name == module_layer_name
+
+    # Load checkpoint parameters in module
+    module.load_state_dict(checkpoint['state_dict'], strict=False)
+
+    # Get the data modules
+    dm = ssa_datamodule_full
+    dm.setup(stage='test')
+    test_loader = dm.test_dataloader()
+
+    # Loop through all batch/samples
+    for batch_idx, batch in enumerate(test_loader):
+        # pass the test batch to the testing step
+        with capsys.disabled():
+            module.test_step(batch, batch_idx)
+
+@pytest.mark.parametrize("batch_size", [1,]) # full finetuning
+def test_generate_prediction_files_with_full_finetuning(mednextv1_small_model: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size: int, capsys):
+    # Load the checkpoint (full_finetuning)
+    full_ft_checkpoint_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\2024-07-25_13-55-36\\best-checkpoint.ckpt"
+    checkpoint = torch.load(full_ft_checkpoint_path)
+
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednextv1_small_model.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    module = BratsLitModuleG(net=mednextv1_small_model, optimizer=optimizer, scheduler=scheduler)
+
+    # Assert if number of keys in loaded checkpoint and keys in module is same
+    assert len(list(checkpoint['state_dict'].keys())) == len(list([x for x in module.state_dict().keys()]))
+
+    for checkpoint_layer_name, module_layer_name in zip(list(checkpoint['state_dict']), list([x for x in module.state_dict()])):
+        assert checkpoint_layer_name == module_layer_name
+
+    # Load checkpoint parameters in module
+    module.load_state_dict(checkpoint['state_dict'], strict=True)
+
+    # Get the data modules
+    dm = ssa_datamodule_full
+    dm.setup(stage='test')
+    test_loader = dm.test_dataloader()
+
+    # Loop through all batch/samples
+    for batch_idx, batch in enumerate(test_loader):
+        # pass the test batch to the testing step
+        with capsys.disabled():
+            module.test_step(batch, batch_idx)
+    
+
+
+@pytest.mark.parametrize("batch_size", [1,]) # finetuned using PEFT
 def test_generate_prediction_files_with_conv_adapter(mednextv1_small_model_with_conv_adapters: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size:int, capsys):
     # Load the finetuned model checkpoint
-    finetuned_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\with_conv_adapter\\runs\\2024-07-20_04-08-04\\checkpoints\\best-checkpoint.ckpt"
+    # finetuned_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\with_conv_adapter\\runs\\2024-07-20_04-08-04\\checkpoints\\best-checkpoint.ckpt" # finetuned on 45 train samples
+    finetuned_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\2024-07-23_10-29-01\\checkpoints\\best-checkpoint.ckpt" # finetuned on full ssa train set (60 samples with new checkpoint from brats2021
     finetuned_checkpoint = torch.load(finetuned_ckpt_path)
 
     # Initialize optimizer and scheduler instances
@@ -671,5 +940,50 @@ def test_generate_prediction_files_with_conv_adapter(mednextv1_small_model_with_
     for batch_idx, batch in enumerate(test_loader):
         # pass the test batch to the testing_step
         with capsys.disabled():
-            test_avg_dice, mask_path = module_with_conv_adapter.test_step(batch, batch_idx)
-            print(f'Dice Score on {os.path.basename(mask_path)} is {test_avg_dice}')
+            module_with_conv_adapter.test_step(batch, batch_idx)
+            
+
+@pytest.mark.parametrize("batch_size", [1,])
+def test_generate_prediction_files_with_conv_adapter_with_gpu(mednextv1_small_model_with_conv_adapters: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size:int, capsys):
+    # Load the finetuned model checkpoint
+    # finetuned_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\with_conv_adapter\\runs\\2024-07-20_04-08-04\\checkpoints\\best-checkpoint.ckpt" # finetuned on 45 train samples
+    finetuned_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\2024-07-23_10-29-01\\checkpoints\\best-checkpoint.ckpt" # finetuned on full ssa train set (60 samples with new checkpoint from brats2021
+    finetuned_checkpoint = torch.load(finetuned_ckpt_path)
+
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednextv1_small_model_with_conv_adapters.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    module_with_conv_adapter = BratsLitModuleG(net=mednextv1_small_model_with_conv_adapters, optimizer=optimizer, scheduler=scheduler)
+
+    # Assert if the number of keys in finetuned_checkpoint and keys in model with conv adapter is same 
+    assert len(list(finetuned_checkpoint['state_dict'].keys())) == len(list(module_with_conv_adapter.state_dict().keys()))
+    
+    # Checking if layer names in both matches 
+    with capsys.disabled():
+        for finetuned_layer_name, layer_name in zip(list(finetuned_checkpoint['state_dict'].keys()), list(module_with_conv_adapter.state_dict().keys())):
+            assert finetuned_layer_name == layer_name
+
+    # Load the finetuned_checkpoint parameters in module_with_conv_adapter
+    module_with_conv_adapter.load_state_dict(finetuned_checkpoint['state_dict'], strict=True)
+
+    # Move model to GPU
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    module_with_conv_adapter.to(device)
+
+    # Get the data modules
+    dm = ssa_datamodule_full
+    dm.setup(stage='test')
+    test_loader = dm.test_dataloader()
+
+    # if batch_size == 1:
+    #     assert len(test_loader) == 15
+
+    # Loop through all the batch/samples
+    for batch_idx, batch in enumerate(test_loader):        
+        # Move batch to GPU
+        batch = dm.transfer_batch_to_device(batch, device, batch_idx)
+
+        # pass the test batch to the testing_step
+        with capsys.disabled():
+            module_with_conv_adapter.test_step(batch, batch_idx)
+            break
