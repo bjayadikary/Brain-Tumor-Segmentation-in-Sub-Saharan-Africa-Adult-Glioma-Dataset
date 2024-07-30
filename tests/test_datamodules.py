@@ -14,7 +14,7 @@ from src.models.components.mednext.MedNeXt import MedNeXt
 
 from src.models.components.mednext.MedNeXt_with_linear_adapter import MedNeXtWithLinearAdapters
 from src.models.components.mednext.MedNeXt_with_conv_adapter import MedNeXtWithAdapters # sequential adapter
-from src.models.components.mednext.MedNeXt_with_parallel_conv_adapter import MedNeXtWithParallelAdapters # parallel adapter
+from src.models.components.mednext.MedNeXt_with_parallel_convnext_adapter import MedNeXtWithParallelAdapters # parallel adapter
 from collections import OrderedDict
 
 import os
@@ -445,7 +445,8 @@ def test_pretrained_checkpoint_and_parallel_adapter(mednext_model_with_convnext_
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
     # Load the pretrained model checkpoint
-    pretrained_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5\\best-checkpoint_spark_himal.ckpt"
+    # pretrained_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_naami_server\\jolly-armadillo-5\\best-checkpoint_spark_himal.ckpt"
+    pretrained_ckpt_path = "C:\\Users\\lenovo\\Desktop\\New folder\\naami_best-checkpoint.ckpt"
     pretrained_checkpoint = torch.load(pretrained_ckpt_path)
 
     # Initialize the new model with adapters
@@ -484,8 +485,8 @@ def test_pretrained_checkpoint_and_parallel_adapter(mednext_model_with_convnext_
     # Load weights/biases (i.e. state_dict) from pretrained checkpoint to new model with adapter that match the layer names. 
     missing_keys, unexpected_keys = model_parallel.load_state_dict(pretrained_checkpoint['state_dict'], strict=False)
     
-    assert missing_keys == 73, "Some keys in checkpoint do not have matching keys in model" # 72 keys in model has to be of adapter which has no values from checkpoint and dice_loss_fn is also not in checkpoint
-    
+    assert len(missing_keys) == 73, "Some keys in checkpoint do not have matching keys in model" # 72 keys in model has to be of adapter which has no values from checkpoint and dice_loss_fn is also not in checkpoint
+
     with capsys.disabled():
         print(f"Missiing keys: ", len(missing_keys))
         print(f"Unexpected keys: ", len(unexpected_keys))
@@ -653,9 +654,11 @@ def mednextv1_small_model_with_mednext_as_adapters(): # mednext_smallv1 model us
     return model
 
 @pytest.mark.parametrize("batch_size", [1,])
-def test_brats21_checkpoint_load_for_finetuning_with_mednext_as_adapter(mednextv1_small_model_with_mednext_as_adapters: torch.nn.Module, batch_size:int, capsys):
+# def test_brats21_checkpoint_load_for_finetuning_with_mednext_as_adapter(mednextv1_small_model_with_mednext_as_adapters: torch.nn.Module, batch_size:int, capsys):
+def test_brats21_checkpoint_load_for_finetuning_with_mednext_as_adapter(mednext_model_with_convnext_sequential_adapters: torch.nn.Module, batch_size:int, capsys):
+
     # Initialize optimizer and scheduler instances
-    optimizer = torch.optim.AdamW(mednextv1_small_model_with_mednext_as_adapters.parameters(), lr=0.002, weight_decay=0.001)
+    optimizer = torch.optim.AdamW(mednext_model_with_convnext_sequential_adapters.parameters(), lr=0.002, weight_decay=0.001)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
 
     # Load the pretrained model checkpoint
@@ -663,7 +666,7 @@ def test_brats21_checkpoint_load_for_finetuning_with_mednext_as_adapter(mednextv
     pretrained_checkpoint = torch.load(pretrained_ckpt_path)
 
     # Initialize the new model with adapters
-    model_with_adapter = BratsLitModule(net=mednextv1_small_model_with_mednext_as_adapters, optimizer=optimizer, scheduler=scheduler)
+    model_with_adapter = BratsLitModule(net=mednext_model_with_convnext_sequential_adapters, optimizer=optimizer, scheduler=scheduler)
 
     # with capsys.disabled():
     #     # for layer in model_with_adapter.state_dict().keys():

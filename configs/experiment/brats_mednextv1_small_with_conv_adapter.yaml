@@ -65,7 +65,12 @@ callbacks:
     mode: "max"
     save_last: True
 
-  early_stopping: null
+  early_stopping:
+    monitor: val_score
+    min_delta: 0.001
+    patience: 20
+    mode: "max"
+    verbose: True
 
 
 # Adding ckpt_path, for resuming training or evaluation
