@@ -14,6 +14,7 @@ class MedNeXtWithAdapters(nn.Module):
         n_classes: int, 
         exp_r: int = 4,                            # Expansion ratio as in Swin Transformers
         kernel_size: int = 7,                      # Ofcourse can test kernel_size
+        adapter_kernel_size: int = 3,
         enc_kernel_size: int = None,
         dec_kernel_size: int = None,
         deep_supervision: bool = False,             # Can be used to test deep supervision
@@ -29,6 +30,8 @@ class MedNeXtWithAdapters(nn.Module):
     ):
 
         super().__init__()
+
+        self.adapter_kernel_size = adapter_kernel_size # added later
 
         self.do_ds = deep_supervision
         assert checkpoint_style in [None, 'outside_block']
@@ -70,7 +73,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels,
                 out_channels=n_channels,
                 exp_r=exp_r[0],
-                kernel_size=enc_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -106,7 +109,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels*2,
                 out_channels=n_channels*2,
                 exp_r=exp_r[1],
-                kernel_size=enc_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -143,7 +146,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels*4,
                 out_channels=n_channels*4,
                 exp_r=exp_r[2],
-                kernel_size=enc_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -181,7 +184,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels*8,
                 out_channels=n_channels*8,
                 exp_r=exp_r[3],
-                kernel_size=enc_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -219,7 +222,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels*16,
                 out_channels=n_channels*16,
                 exp_r=exp_r[4],
-                kernel_size=dec_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -257,7 +260,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels*8,
                 out_channels=n_channels*8,
                 exp_r=exp_r[5],
-                kernel_size=dec_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -293,7 +296,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels*4,
                 out_channels=n_channels*4,
                 exp_r=exp_r[6],
-                kernel_size=dec_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -329,7 +332,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels*2,
                 out_channels=n_channels*2,
                 exp_r=exp_r[7],
-                kernel_size=dec_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,
@@ -367,7 +370,7 @@ class MedNeXtWithAdapters(nn.Module):
                 in_channels=n_channels,
                 out_channels=n_channels,
                 exp_r=exp_r[8],
-                kernel_size=dec_kernel_size,
+                kernel_size=self.adapter_kernel_size,
                 do_res=do_res,
                 norm_type=norm_type,
                 dim=dim,

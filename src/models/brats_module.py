@@ -4,8 +4,8 @@ import torch
 import torchio as tio
 
 from monai.metrics import CumulativeIterationMetric
-# from monai.losses import DiceLoss
-from monai.losses import DiceCELoss # Two changes in the file to incorporate DiceCELoss; first on this import and Second while instantiating DiceCELoss in the init. while instantiating added extra argument ce_weight for making it weighted dicece loss. Also, imported Parameter, created new class LearnableWeightedDiceCELoss
+from monai.losses import DiceLoss
+# from monai.losses import DiceCELoss # Two changes in the file to incorporate DiceCELoss; first on this import and Second while instantiating DiceCELoss in the init. while instantiating added extra argument ce_weight for making it weighted dicece loss. Also, imported Parameter, created new class LearnableWeightedDiceCELoss
 from torch.nn import Parameter
 
 from monai.metrics.meandice import DiceMetric
@@ -37,7 +37,8 @@ class BratsLitModule(LightningModule):
         self.net = net
 
         # Initialize dice loss
-        self.dice_loss_fn = DiceCELoss(include_background=False, to_onehot_y=True, softmax=True)
+        self.dice_loss_fn = DiceLoss(include_background=False, to_onehot_y=True, softmax=True)
+        # self.dice_loss_fn = DiceCELoss(include_background=False, to_onehot_y=True, softmax=True)
         
         # Initialize dice score for calculating validation dice score and test dice score
         self.dice_score_fn_train = DiceMetric(include_background=False)

@@ -35,6 +35,7 @@ model:
     n_channels: 32
     exp_r: 2
     kernel_size: 3
+    adapter_kernel_size: 3
     deep_supervision: False
     do_res: True
     do_res_up_down: True
