@@ -212,6 +212,9 @@ def test_brats_litmodule_forward_pass_unet(unet_model: torch.nn.Module, batch_si
     expected_shape = (batch_size, 4, 128, 128, 128)
     assert output.shape == expected_shape
 
+# Test the shape of data
+# @pytest.mark.parametrize("batch_size", [1,])
+# def test_shape_of_data(unet)
 
 @pytest.mark.parametrize("batch_size", [1,])
 def test_brats_litmodule_training_and_validation_step(unet_model: UNet, brats_datamodule: BratsDataModule, batch_size:int, capsys):
@@ -776,7 +779,7 @@ def mednextv1_small_model_with_large_linear_adapters(): # mednext_smallv1 model 
     return model
 
 @pytest.fixture
-def mednextv1_small_model_with_conv_adapters(): # with convolution adapter
+def mednextv1_small_model_with_conv_adapters(): # with convolution adapter (sequential version)
     model = MedNeXtWithAdapters(
         in_channels=4,
         n_classes=4,
@@ -789,6 +792,21 @@ def mednextv1_small_model_with_conv_adapters(): # with convolution adapter
         block_counts=[2,2,2,2,2,2,2,2,2],
     )
 
+    return model
+
+@pytest.fixture
+def mednextv1_small_model_with_parallel_conv_adapters(): # parallel adapter
+    model = MedNeXtWithParallelAdapters(
+        in_channels=4,
+        n_classes=4,
+        n_channels=32,
+        exp_r=2,
+        kernel_size=3,
+        deep_supervision=False,
+        do_res=True,
+        do_res_up_down=True,
+        block_counts=[2,2,2,2,2,2,2,2,2]
+    )
     return model
 
 # @pytest.mark.parametrize("batch_size", [1,])
@@ -907,7 +925,6 @@ def test_generate_prediction_files_with_full_finetuning(mednextv1_small_model: t
             module.test_step(batch, batch_idx)
     
 
-
 @pytest.mark.parametrize("batch_size", [1,]) # finetuned using PEFT
 def test_generate_prediction_files_with_conv_adapter(mednextv1_small_model_with_conv_adapters: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size:int, capsys):
     # Load the finetuned model checkpoint
@@ -990,3 +1007,40 @@ def test_generate_prediction_files_with_conv_adapter_with_gpu(mednextv1_small_mo
         with capsys.disabled():
             module_with_conv_adapter.test_step(batch, batch_idx)
             break
+
+
+@pytest.mark.parametrize("batch_size", [1,]) # finetuned using PEFT
+def test_generate_prediction_files_with_parallel_conv_adapter(mednextv1_small_model_with_parallel_conv_adapters: torch.nn.Module, ssa_datamodule_full:BratsDataModule, batch_size:int, capsys):
+    # Load the finetuned model checkpoint
+    finetuned_ckpt_path = "C:\\Users\\lenovo\\Desktop\\logs_from_server\\logs_from_cc\\2024-07-31_05-44-00_parallel_adapter\\checkpoints\\best-checkpoint.ckpt"
+    finetuned_checkpoint = torch.load(finetuned_ckpt_path)
+
+    # Initialize optimizer and scheduler instances
+    optimizer = torch.optim.AdamW(mednextv1_small_model_with_parallel_conv_adapters.parameters(), lr=0.002, weight_decay=0.001)
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer)
+    module_with_parallel_conv_adapter = BratsLitModuleG(net=mednextv1_small_model_with_parallel_conv_adapters, optimizer=optimizer, scheduler=scheduler)
+
+    # Assert if the number of keys in finetuned_checkpoint and keys in model with parallel conv adapter is same
+    assert len(list(finetuned_checkpoint['state_dict'].keys())) == len(list(module_with_parallel_conv_adapter.state_dict().keys()))
+
+    # Checking if layer names in both matches
+    with capsys.disabled():
+        for finetuned_layer_name, layer_name in zip(list(finetuned_checkpoint['state_dict'].keys()), list(module_with_parallel_conv_adapter.state_dict().keys())):
+            assert finetuned_layer_name == layer_name
+    
+    # Load the finetuned_checkpoint parameters in module_with_parallel_conv_adapter
+    module_with_parallel_conv_adapter.load_state_dict(finetuned_checkpoint['state_dict'], strict=True)
+
+    # Get the data modules
+    dm = ssa_datamodule_full
+    dm.setup(stage='test')
+    test_loader = dm.test_dataloader()
+
+    if batch_size == 1:
+        assert len(test_loader) == 35
+    
+    # Loop through all the batch/samples
+    for batch_idx, batch in enumerate(test_loader):
+        # pass the test batch to the testing step
+        with capsys.disabled():
+            module_with_parallel_conv_adapter.test_step(batch, batch_idx)
