@@ -1,9 +1,6 @@
 # 📌 Data Preparation for Sub-Saharan African 2023 Dataset (SSA23)
 ## Downloading the SSA dataset
-Run the below code to download the dataset
-```bash
-gdown https://drive.google.com/uc?id=1ooIpXdQrgA2y0PSRz_yMrU8GTxkWbPlv 
-```
+Download the SSA dataset
 Then, extract the files with
 ```bash
 unrar x BraTS2023_SSA.rar
