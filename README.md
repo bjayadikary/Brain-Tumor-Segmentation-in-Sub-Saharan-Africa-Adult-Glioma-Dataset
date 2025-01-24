@@ -1,12 +1,20 @@
-# 📌 Data Preparation for Sub-Saharan African 2023 Dataset (SSA23)
-## Downloading the SSA dataset
-Download the SSA dataset
-Then, extract the files with
-```bash
-unrar x BraTS2023_SSA.rar
-```
+This repository contains the implementation of the MedNeXt architecture with parameter-efficient fine-tuning (PEFT) using convolutional adapters for brain tumor segmentation. For more details: paper
 
-The BraTS2023_SSA directory looks like:
+# 📌 Overview
+This project addresses the segmentation of multi-modal 3D MRI volumes, where the input consists of four MRI sequences: T1-weighted (T1w), T1-weighted contrast-enhanced (T1-c), T2-weighted (T2W), and T2-weighted FLAIR.
+
+The model outputs segmentation masks identifying four classes: Background, Enhancing Tumor (ET), Non-Enhancing Tumor Core (NETC), Surrounding Non-Enhancing FLAIR Hyperintensity (SNFH).
+
+# 📌 Environment Setup
+To set up the environment, clone this repository and install the dependencies from requirements.txt
+
+# 📌 Dataset Preparation
+We use two publicly available datasets:
+* BraTS 2021 training data: 1251 adult glioma cases
+* BraTS Africa training data: 60 adult glioma cases with lower spatial resolution and unique characteristics such as late presentation
+
+## Data Preparation for Sub-Saharan African 2023 Dataset
+The BraTS2023_SSA directory looks like this:
 ```
 BraTS2023_SSA
 |-- BraTS2023_SSA_Training
@@ -23,20 +31,6 @@ BraTS2023_SSA
 |   |   |   |-- BraTS-SSA-00007-000-t1n.nii.gz
 |   |   |   |-- BraTS-SSA-00007-000-t2f.nii.gz
 |   |   |   |-- BraTS-SSA-00007-000-t2w.nii.gz
-|   |   |--...
-|-- BraTS2023_SSA_Validation
-|   |-- BraTS-SSA-00126-000
-|   |   |-- BraTS-SSA-00126-000-seg.nii.gz
-|   |   |-- BraTS-SSA-00126-000-t1c.nii.gz
-|   |   |-- BraTS-SSA-00126-000-t1n.nii.gz
-|   |   |-- BraTS-SSA-00126-000-t2f.nii.gz
-|   |   |-- BraTS-SSA-00126-000-t2w.nii.gz
-|   |-- BraTS-SSA-00129-000
-|   |   |-- BraTS-SSA-00129-000-seg.nii.gz
-|   |   |-- BraTS-SSA-00129-000-t1c.nii.gz
-|   |   |-- BraTS-SSA-00129-000-t1n.nii.gz
-|   |   |-- BraTS-SSA-00129-000-t2f.nii.gz
-|   |   |-- BraTS-SSA-00129-000-t2w.nii.gz
 |   |   |--...
 ```
 
@@ -85,7 +79,7 @@ stacked
 |   |-- ...
 ```
 
-# 📌 Data Preparation for BraTS 2021 Dataset
+## Data Preparation for BraTS 2021 Dataset
 Download the BraTS 2021 dataset. The directory looks similar to SSA23 dataset directory, except the number of samples in BraTS2021 is comparatively higher.
 ```
 BraTS2021
@@ -152,6 +146,47 @@ stacked
 |-- TestVolumes
 |-- TestSegmentations
 ```
+
+# 📌 Training
+## Pre-training on BraTS 2021 dataset
+To pre-train the model on the BraTS 2021 dataset:
+```bash
+python src/train.py experiment=brats_mednextv1_small.yaml logger=wandb ++logger.wandb.mode="online" ++trainer.max_epochs=... ++data.batch_size=... ++data.data_dir="...stacked_directory_path_of_brats2021_dataset" tags=[brats_2021,mednextv1_small]
+```
+Ensure wandb is setup and suitable epochs, batch_size, data_dir is specified.
+
+## Fine-tuning on SSA
+### Full Fine-tuning
+Fine-tune all parameters on the SSA dataset with:
+```bash
+```
+
+### Fine-tuning with Parallel Adapter
+To fine-tune the model using parallel adapter placement, do:
+```bash
+```
+
+### Fine-tuning with Sequential Adapter
+Fine-tune the model using sequential adapter placement with:
+```bash
+```
+Respective models will be saved in the specified output folder
+
+# 📌 Inference
+Run inference on a set of test images:
+```bash
+```
+Results will be saved as segmentation masks in the specified output folder
+
+# 📌 Results
+The sequential adapter variation achieved:
+* Average Dice Score: 0.80
+* Total Parameters: 34.99 M
+* Training Time: ~4 hours (compared to ~10 hours for full fine-tuning)
+
+For a comparison of Sequential vs Parallel adapter placements, refer to the supplementary materials.
+
+
   
 <div align="center">
 <br>
