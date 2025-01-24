@@ -1,9 +1,9 @@
-This repository contains the implementation of the MedNeXt architecture with parameter-efficient fine-tuning (PEFT) using convolutional adapters for brain tumor segmentation. For more details: paper
+This repository contains the implementation of the MedNeXt architecture with parameter-efficient fine-tuning (PEFT) using convolutional adapters for brain tumor segmentation. For more details: https://arxiv.org/pdf/2412.14100
 
 # 📌 Overview
-This project addresses the segmentation of multi-modal 3D MRI volumes, where the input consists of four MRI sequences: T1-weighted (T1w), T1-weighted contrast-enhanced (T1-c), T2-weighted (T2W), and T2-weighted FLAIR.
+This project addresses the segmentation of multi-modal 3D MRI volumes, where the input consists of four MRI sequences: T1-weighted (T1w), T1-weighted contrast-enhanced (T1-c), T2-weighted (T2w), and T2-weighted FLAIR.
 
-The model outputs segmentation masks identifying four classes: Background, Enhancing Tumor (ET), Non-Enhancing Tumor Core (NETC), Surrounding Non-Enhancing FLAIR Hyperintensity (SNFH).
+The model outputs segmentation masks identifying four classes: Background, Enhancing Tumor (ET), Non-Enhancing Tumor Core (NETC), and Surrounding Non-Enhancing FLAIR Hyperintensity (SNFH).
 
 # 📌 Environment Setup
 To set up the environment, clone this repository and install the dependencies from requirements.txt
@@ -151,7 +151,7 @@ stacked
 ## Pre-training on BraTS 2021 dataset
 To pre-train the model on the BraTS 2021 dataset:
 ```bash
-python src/train.py experiment=brats_mednextv1_small.yaml logger=wandb ++logger.wandb.mode="online" ++trainer.max_epochs=... ++data.batch_size=... ++data.data_dir="...stacked_directory_path_of_brats2021_dataset" tags=[brats_2021,mednextv1_small]
+python src/train.py experiment=brats_mednextv1_small.yaml logger=wandb ++logger.wandb.mode="online" ++trainer.max_epochs=... ++data.batch_size=... ++data.data_dir="...stacked_directory_path_of_brats2021_dataset"
 ```
 Ensure wandb is setup and suitable epochs, batch_size, data_dir is specified.
 
@@ -159,33 +159,30 @@ Ensure wandb is setup and suitable epochs, batch_size, data_dir is specified.
 ### Full Fine-tuning
 Fine-tune all parameters on the SSA dataset with:
 ```bash
+python src/train.py experiment=brats_mednextv1_small.yaml logger=wandb ++logger.wandb.mode="online" ++trainer.max_epochs=... ++data.batch_size=...  ++data.data_dir="...stacked_directory_path_of_ssa_dataset" ++ckpt_path=”…best_checkpoint_path_of_brats21”
 ```
 
 ### Fine-tuning with Parallel Adapter
 To fine-tune the model using parallel adapter placement, do:
 ```bash
+python src/train.py experiment=brats_mednextv1_small_with_sequential_convnext_adapter.yaml logger=wandb ++logger.wandb.mode="online" ++trainer.max_epochs=... ++data.batch_size=...  ++data.data_dir="...stacked_directory_path_of_ssa_dataset" ++ckpt_path=”…best_checkpoint_path_of_brats21”
 ```
 
 ### Fine-tuning with Sequential Adapter
 Fine-tune the model using sequential adapter placement with:
 ```bash
+python src/train.py experiment=brats_mednextv1_small_with_parallel_convnext_adapter.yaml logger=wandb ++logger.wandb.mode="online" ++trainer.max_epochs=... ++data.batch_size=...  ++data.data_dir="...stacked_directory_path_of_ssa_dataset" ++ckpt_path=”…best_checkpoint_path_of_brats21”
 ```
-Respective models will be saved in the specified output folder
 
-# 📌 Inference
-Run inference on a set of test images:
+If you find this work helpful, please consider citing it as:
 ```bash
+@article{adhikari2024parameter,
+  title={Parameter-efficient Fine-tuning for improved Convolutional Baseline for Brain Tumor Segmentation in Sub-Saharan Africa Adult Glioma Dataset},
+  author={Adhikari, Bijay and Kulung, Pratibha and Bohaju, Jakesh and Poudel, Laxmi Kanta and Raymond, Confidence and Zhang, Dong and Anazodo, Udunna C and Khanal, Bishesh and Shakya, Mahesh},
+  journal={arXiv preprint arXiv:2412.14100},
+  year={2024}
+}
 ```
-Results will be saved as segmentation masks in the specified output folder
-
-# 📌 Results
-The sequential adapter variation achieved:
-* Average Dice Score: 0.80
-* Total Parameters: 34.99 M
-* Training Time: ~4 hours (compared to ~10 hours for full fine-tuning)
-
-For a comparison of Sequential vs Parallel adapter placements, refer to the supplementary materials.
-
 
   
 <div align="center">
