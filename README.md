@@ -155,7 +155,7 @@ python src/train.py experiment=brats_mednextv1_small.yaml logger=wandb ++logger.
 ```
 Ensure wandb is setup and suitable epochs, batch_size, data_dir is specified.
 
-## Fine-tuning on SSA
+## Fine-tuning on BraTS Africa dataset
 ![image](https://github.com/user-attachments/assets/f93cd716-4f03-48e2-9dc6-236584f1b006)
 ### Full Fine-tuning
 Fine-tune all parameters on the SSA dataset with:
