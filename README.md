@@ -156,6 +156,7 @@ python src/train.py experiment=brats_mednextv1_small.yaml logger=wandb ++logger.
 Ensure wandb is setup and suitable epochs, batch_size, data_dir is specified.
 
 ## Fine-tuning on SSA
+![image](https://github.com/user-attachments/assets/2e78afa5-d487-46ca-9d8c-635b931dd151)
 ### Full Fine-tuning
 Fine-tune all parameters on the SSA dataset with:
 ```bash
